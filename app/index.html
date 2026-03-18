@@ -192,6 +192,22 @@
             flex-shrink: 0;
         }
 
+        #selection-count {
+            display: none;
+            align-items: center;
+            height: 26px;
+            padding: 0 10px;
+            border: 1px solid var(--orange-dim);
+            border-radius: 999px;
+            background: rgba(232, 114, 12, 0.10);
+            color: var(--orange);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            user-select: none;
+        }
+
         .fb-btn {
             font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
@@ -230,6 +246,59 @@
             flex: 1;
             overflow-y: auto;
             padding: 16px;
+            position: relative;
+        }
+
+        #fb-content.is-loading #file-grid,
+        #fb-content.is-loading #file-list {
+            filter: blur(3px);
+            opacity: 0.55;
+            pointer-events: none;
+            transition: filter 0.14s ease, opacity 0.14s ease;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: rgba(26, 20, 16, 0.10);
+            backdrop-filter: blur(0px);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        #fb-content.is-loading .loading-overlay {
+            display: flex;
+        }
+
+        .loading-overlay .loading-label {
+            font-size: 11px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        #selection-box {
+            position: absolute;
+            border: 2px solid var(--orange);
+            background: rgba(232, 114, 12, 0.12);
+            background-image: repeating-linear-gradient(
+                45deg,
+                rgba(232, 114, 12, 0.16) 0px,
+                rgba(232, 114, 12, 0.16) 10px,
+                rgba(232, 114, 12, 0.06) 10px,
+                rgba(232, 114, 12, 0.06) 20px
+            );
+            box-shadow:
+                0 0 0 1px rgba(232, 114, 12, 0.22) inset,
+                0 10px 26px rgba(232, 114, 12, 0.10);
+            border-radius: 2px;
+            display: none;
+            z-index: 6;
+            pointer-events: none;
         }
 
         #fb-content::-webkit-scrollbar {
@@ -1202,6 +1271,7 @@
                 <button class="fb-btn" id="btn-home"><i class="fa-solid fa-house"></i> HOME</button>
                 <button class="fb-btn" id="btn-refresh"><i class="fa-solid fa-rotate-right"></i> REFRESH</button>
                 <button class="fb-btn danger" id="btn-delete" disabled><i class="fa-solid fa-trash"></i> DELETE</button>
+                <span id="selection-count">0 selected</span>
                 <select id="sort-select" title="Sort order">
                     <option value="name-asc">Name A–Z</option>
                     <option value="name-desc">Name Z–A</option>
@@ -1420,19 +1490,45 @@
             return children;
         }
 
-        async function fsMkdir(path) {
+        async function fsAssertDirExists(path) {
             path = normPath(path);
+            const node = await idbGet(path);
+            if (!node || !node.is_dir) throw new Error(`Folder does not exist: ${path}`);
+            return node;
+        }
+
+        async function fsMkdir(path, opts = {}) {
+            path = normPath(path);
+            await fsEnsureRoot();
+
+            if (path === '/') return await idbGet('/');
+
             const existing = await idbGet(path);
-            if (existing) return existing;
+            if (existing) {
+                if (!existing.is_dir) throw new Error(`Not a directory: ${path}`);
+                return existing;
+            }
+
             const parent = parentOf(path);
+            if (opts.ensureParents === false) {
+                await fsAssertDirExists(parent);
+            } else {
+                const parentNode = await idbGet(parent);
+                if (!parentNode) await fsMkdir(parent, opts);
+                else if (!parentNode.is_dir) throw new Error(`Not a directory: ${parent}`);
+            }
+
             await idbPut({ path, name: nameOf(path), is_dir: true, parent, content: null, size: 0, created: Date.now(), modified: Date.now() });
             return await idbGet(path);
         }
 
-        async function fsWrite(path, content) {
+        async function fsWrite(path, content, opts = {}) {
             path = normPath(path);
             const parent = parentOf(path);
-            if (parent !== path) await fsMkdir(parent);
+            if (parent !== path) {
+                if (opts.ensureParent === false) await fsAssertDirExists(parent);
+                else await fsMkdir(parent);
+            }
             let buf;
             if (typeof content === 'string') {
                 buf = new TextEncoder().encode(content).buffer;
@@ -1487,13 +1583,14 @@
             }
         }
 
-        async function fsMove(srcPath, destPath) {
+        async function fsMove(srcPath, destPath, opts = {}) {
             srcPath = normPath(srcPath);
             destPath = normPath(destPath);
             const node = await idbGet(srcPath);
             if (!node) throw new Error(`Not found: ${srcPath}`);
             const newPath = normPath(destPath + '/' + node.name);
-            await fsMkdir(destPath);
+            if (opts.ensureDest === false) await fsAssertDirExists(destPath);
+            else await fsMkdir(destPath);
             await idbDelete(srcPath);
             node.path = newPath;
             node.parent = destPath;
@@ -1686,11 +1783,53 @@
             }
         }
 
+        async function downloadSelected() {
+            const paths = Array.from(selectedPaths);
+            if (!paths.length) return;
+
+            if (paths.length === 1) {
+                const node = await idbGet(paths[0]);
+                if (!node) { setStatus('', `Download error: Not found: ${paths[0]}`); return; }
+                if (node.is_dir) await downloadFolder(node);
+                else await downloadFile(node);
+                return;
+            }
+
+            setStatus('', `Zipping ${paths.length} items…`);
+            try {
+                const entries = [];
+                for (const p of paths) {
+                    const node = await idbGet(normPath(p));
+                    if (!node) continue;
+                    if (node.is_dir) {
+                        const sub = await collectFilesRecursive(node.path, node.name);
+                        entries.push(...sub);
+                    } else {
+                        entries.push({ node, relPath: node.name });
+                    }
+                }
+
+                if (entries.length === 0) {
+                    setStatus('', `Nothing to download`);
+                    return;
+                }
+
+                const zipBuf = await buildZip(entries);
+                const blob = new Blob([zipBuf], { type: 'application/zip' });
+                const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+                triggerDownload(blob, `selection-${stamp}.zip`);
+                setStatus('', `Downloaded selection (${entries.length} files)`);
+            } catch (e) {
+                setStatus('', `ZIP error: ${e.message}`);
+            }
+        }
+
         // ─────────────────────────────────────────────────────────────────────────
 
         let currentPath = '/';
         let files = [];
         let selectedItem = null;
+        const selectedPaths = new Set();
         let viewMode = 'grid';
         let sortMode = 'name-asc';
         let historyStack = [];
@@ -1711,6 +1850,52 @@
         const chatMessages = document.getElementById('chat-messages');
         const chatInput = document.getElementById('chat-input');
         const sendBtn = document.getElementById('send-btn');
+        const deleteBtn = document.getElementById('btn-delete');
+        const selectionCount = document.getElementById('selection-count');
+
+        const selectionBox = document.createElement('div');
+        selectionBox.id = 'selection-box';
+        fbContent.appendChild(selectionBox);
+
+        function getVisibleItemElements() {
+            const container = fbContent.classList.contains('view-list')
+                ? fbContent.querySelector('#file-list')
+                : fbContent.querySelector('#file-grid');
+            return Array.from(container ? container.children : []);
+        }
+
+        function syncSelectionUI() {
+            const els = getVisibleItemElements();
+            for (const el of els) {
+                const p = el.dataset.path;
+                if (!p) continue;
+                el.classList.toggle('selected', selectedPaths.has(p));
+            }
+            deleteBtn.disabled = selectedPaths.size === 0;
+            if (selectionCount) {
+                if (selectedPaths.size > 0) {
+                    selectionCount.style.display = 'inline-flex';
+                    selectionCount.textContent = `${selectedPaths.size} selected`;
+                } else {
+                    selectionCount.style.display = 'none';
+                    selectionCount.textContent = '0 selected';
+                }
+            }
+        }
+
+        function clearSelection() {
+            selectedPaths.clear();
+            selectedItem = null;
+            syncSelectionUI();
+        }
+
+        function setSingleSelection(item, el) {
+            selectedPaths.clear();
+            selectedPaths.add(item.path);
+            selectedItem = item;
+            syncSelectionUI();
+            if (el) el.classList.add('selected');
+        }
 
         function getIconClass(item) {
             if (item.is_dir) return 'fa-solid fa-folder';
@@ -1751,27 +1936,68 @@
             return (bytes / 1048576).toFixed(1) + 'M';
         }
 
+        function ensureLoadingOverlay(label = 'Refreshing…') {
+            let overlay = fbContent.querySelector('.loading-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'loading-overlay';
+                overlay.innerHTML = `<div class="spinner"></div><div class="loading-label"></div>`;
+                fbContent.appendChild(overlay);
+            }
+            const lbl = overlay.querySelector('.loading-label');
+            if (lbl) lbl.textContent = label;
+            return overlay;
+        }
+
+        function ensureSelectionBox() {
+            if (!fbContent.querySelector('#selection-box')) {
+                fbContent.appendChild(selectionBox);
+            }
+            return selectionBox;
+        }
+
         async function loadDir(path) {
-            fbContent.innerHTML = `<div class="fb-state"><div class="spinner"></div><span>Loading…</span></div>`;
             setStatus('', `Loading ${path}…`);
+            const hasListing = !!(fbContent.querySelector('#file-grid') || fbContent.querySelector('#file-list'));
+
+            if (hasListing) {
+                fbContent.classList.add('is-loading');
+                ensureLoadingOverlay('Refreshing…');
+            } else {
+                fbContent.className = 'view-' + viewMode;
+                fbContent.innerHTML = `<div class="fb-state"><div class="spinner"></div><span>Loading…</span></div>`;
+                ensureSelectionBox();
+            }
+
             try {
                 const items = await fsReaddir(path);
                 files = items;
                 currentPath = path;
                 pathDisplay.textContent = path;
+                clearSelection();
                 renderFiles();
+                requestAnimationFrame(() => fbContent.classList.remove('is-loading'));
                 setStatus(`${items.length} items`, '');
             } catch (e) {
-                fbContent.innerHTML = `<div class="fb-state"><i class="fa-solid fa-triangle-exclamation" style="font-size:28px;opacity:0.5"></i><span>Error: ${e.message}</span></div>`;
+                fbContent.classList.remove('is-loading');
+                if (!hasListing) {
+                    fbContent.innerHTML = `<div class="fb-state"><i class="fa-solid fa-triangle-exclamation" style="font-size:28px;opacity:0.5"></i><span>Error: ${e.message}</span></div>`;
+                }
                 setStatus('', `Error: ${e.message}`);
             }
         }
 
         function renderFiles() {
-            fbContent.className = 'view-' + viewMode;
+            const wasLoading = fbContent.classList.contains('is-loading');
+            const overlay = fbContent.querySelector('.loading-overlay');
+            fbContent.className = 'view-' + viewMode + (wasLoading ? ' is-loading' : '');
             fbContent.innerHTML = '';
+            if (overlay) fbContent.appendChild(overlay);
+            ensureSelectionBox();
             if (files.length === 0) {
                 fbContent.innerHTML = `<div class="fb-state"><i class="fa-regular fa-folder-open" style="font-size:40px;opacity:0.3"></i><span>Empty directory</span></div>`;
+                if (overlay) fbContent.appendChild(overlay);
+                ensureSelectionBox();
                 return;
             }
 
@@ -1844,10 +2070,14 @@
         }
 
         function handleFileClick(e, item, el) {
-            document.querySelectorAll('.file-item.selected, .list-item.selected').forEach(x => x.classList.remove('selected'));
-            el.classList.add('selected');
-            selectedItem = item;
-            document.getElementById('btn-delete').disabled = false;
+            if (e && (e.metaKey || e.ctrlKey)) {
+                if (selectedPaths.has(item.path)) selectedPaths.delete(item.path);
+                else selectedPaths.add(item.path);
+                selectedItem = item;
+                syncSelectionUI();
+                return;
+            }
+            setSingleSelection(item, el);
         }
 
         function handleFileOpen(item) {
@@ -1858,6 +2088,112 @@
                 openEditor(item);
             }
         }
+
+        // ── Drag (marquee) selection ─────────────────────────────────────────────
+
+        let isMarqueeSelecting = false;
+        let marqueeStartClient = null;
+        let marqueeBaseSelection = null;
+        let marqueeMoved = false;
+
+        function rectsIntersect(a, b) {
+            return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+        }
+
+        function replaceSelection(nextSet) {
+            selectedPaths.clear();
+            for (const p of nextSet) selectedPaths.add(p);
+            syncSelectionUI();
+        }
+
+        function updateSelectedItemFromSelection() {
+            if (selectedPaths.size === 1) {
+                const onlyPath = selectedPaths.values().next().value;
+                selectedItem = files.find(f => f.path === onlyPath) || null;
+            } else if (selectedPaths.size === 0) {
+                selectedItem = null;
+            } else {
+                selectedItem = null;
+            }
+        }
+
+        fbContent.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            if (fbContent.classList.contains('is-loading')) return;
+            if (e.target.closest('.file-item, .list-item')) return;
+            if (e.target.closest('#ctx-menu')) return;
+
+            isMarqueeSelecting = true;
+            marqueeMoved = false;
+            marqueeStartClient = { x: e.clientX, y: e.clientY };
+            marqueeBaseSelection = (e.metaKey || e.ctrlKey) ? new Set(selectedPaths) : new Set();
+
+            const r = fbContent.getBoundingClientRect();
+            const startX = marqueeStartClient.x - r.left + fbContent.scrollLeft;
+            const startY = marqueeStartClient.y - r.top + fbContent.scrollTop;
+            selectionBox.style.left = `${startX}px`;
+            selectionBox.style.top = `${startY}px`;
+            selectionBox.style.width = '0px';
+            selectionBox.style.height = '0px';
+            selectionBox.style.display = 'block';
+
+            if (!(e.metaKey || e.ctrlKey)) replaceSelection(new Set());
+
+            const onMove = (ev) => {
+                if (!isMarqueeSelecting) return;
+                const dx = Math.abs(ev.clientX - marqueeStartClient.x);
+                const dy = Math.abs(ev.clientY - marqueeStartClient.y);
+                if (dx + dy > 3) marqueeMoved = true;
+
+                const r2 = fbContent.getBoundingClientRect();
+                const curX = ev.clientX - r2.left + fbContent.scrollLeft;
+                const curY = ev.clientY - r2.top + fbContent.scrollTop;
+                const x1 = Math.min(startX, curX);
+                const y1 = Math.min(startY, curY);
+                const x2 = Math.max(startX, curX);
+                const y2 = Math.max(startY, curY);
+                selectionBox.style.left = `${x1}px`;
+                selectionBox.style.top = `${y1}px`;
+                selectionBox.style.width = `${x2 - x1}px`;
+                selectionBox.style.height = `${y2 - y1}px`;
+
+                const selRect = {
+                    left: Math.min(marqueeStartClient.x, ev.clientX),
+                    top: Math.min(marqueeStartClient.y, ev.clientY),
+                    right: Math.max(marqueeStartClient.x, ev.clientX),
+                    bottom: Math.max(marqueeStartClient.y, ev.clientY),
+                };
+
+                const next = new Set(marqueeBaseSelection);
+                for (const el of getVisibleItemElements()) {
+                    const p = el.dataset.path;
+                    if (!p) continue;
+                    const er = el.getBoundingClientRect();
+                    if (rectsIntersect(selRect, er)) next.add(p);
+                    else if (!(e.metaKey || e.ctrlKey)) next.delete(p);
+                }
+
+                replaceSelection(next);
+                updateSelectedItemFromSelection();
+            };
+
+            const onUp = () => {
+                if (!isMarqueeSelecting) return;
+                isMarqueeSelecting = false;
+                selectionBox.style.display = 'none';
+                window.removeEventListener('mousemove', onMove, true);
+                window.removeEventListener('mouseup', onUp, true);
+                if (!marqueeMoved && !(e.metaKey || e.ctrlKey)) {
+                    clearSelection();
+                } else {
+                    updateSelectedItemFromSelection();
+                }
+            };
+
+            window.addEventListener('mousemove', onMove, true);
+            window.addEventListener('mouseup', onUp, true);
+            e.preventDefault();
+        });
 
         async function openEditor(item) {
             if (item.is_dir) return;
@@ -1949,19 +2285,31 @@
 
         function showCtxMenu(e, item) {
             e.preventDefault();
-            selectedItem = item;
-            document.querySelectorAll('.file-item.selected, .list-item.selected').forEach(x => x.classList.remove('selected'));
-            const el = e.currentTarget;
-            el.classList.add('selected');
-            document.getElementById('btn-delete').disabled = false;
+            if (selectedPaths.size > 0 && selectedPaths.has(item.path)) {
+                selectedItem = item;
+                syncSelectionUI();
+            } else {
+                setSingleSelection(item, e.currentTarget);
+            }
 
             // Show/hide context-sensitive items
-            ctxMenu.querySelectorAll('.file-only').forEach(el => el.style.display = item.is_dir ? 'none' : 'flex');
-            ctxMenu.querySelectorAll('.dir-only').forEach(el => el.style.display = item.is_dir ? 'flex' : 'none');
+            const multi = selectedPaths.size > 1;
+            ctxMenu.querySelectorAll('.file-only').forEach(el => el.style.display = (multi || !item.is_dir) ? 'flex' : 'none');
+            ctxMenu.querySelectorAll('.dir-only').forEach(el => el.style.display = (multi || item.is_dir) ? 'flex' : 'none');
 
-            // Hide "Edit" for directories
             const editItem = ctxMenu.querySelector('[data-action="edit"]');
-            editItem.style.display = item.is_dir ? 'none' : 'flex';
+            const renameItem = ctxMenu.querySelector('[data-action="rename"]');
+            const moveItem = ctxMenu.querySelector('[data-action="move"]');
+
+            if (multi) {
+                if (editItem) editItem.style.display = 'none';
+                if (renameItem) renameItem.style.display = 'none';
+                if (moveItem) moveItem.style.display = 'none';
+            } else {
+                if (editItem) editItem.style.display = item.is_dir ? 'none' : 'flex';
+                if (renameItem) renameItem.style.display = 'flex';
+                if (moveItem) moveItem.style.display = 'flex';
+            }
 
             ctxMenu.style.left = Math.min(e.clientX, window.innerWidth - 190) + 'px';
             ctxMenu.style.top = Math.min(e.clientY, window.innerHeight - 220) + 'px';
@@ -1972,27 +2320,42 @@
         document.addEventListener('contextmenu', e => { if (!e.target.closest('.file-item, .list-item')) ctxMenu.style.display = 'none'; });
 
         ctxMenu.querySelectorAll('.ctx-item').forEach(item => {
-            item.addEventListener('click', () => {
+            item.addEventListener('click', async () => {
                 const action = item.dataset.action;
                 if (!selectedItem) return;
                 if (action === 'open') handleFileOpen(selectedItem);
                 if (action === 'edit') openEditor(selectedItem);
                 if (action === 'rename') openRename(selectedItem);
                 if (action === 'move') openMove(selectedItem);
-                if (action === 'delete') deleteItem(selectedItem);
-                if (action === 'download-file') downloadFile(selectedItem);
-                if (action === 'download-folder') downloadFolder(selectedItem);
+                if (action === 'delete') await deleteSelected();
+                if (action === 'download-file') await downloadSelected();
+                if (action === 'download-folder') await downloadSelected();
                 ctxMenu.style.display = 'none';
             });
         });
 
-        async function deleteItem(item) {
-            if (!confirm(`Delete "${item.name}"? This cannot be undone.`)) return;
+        async function deleteSelected() {
+            const paths = Array.from(selectedPaths);
+            if (!paths.length) return;
+
+            const label = paths.length === 1
+                ? `Delete "${(selectedItem && selectedItem.name) ? selectedItem.name : paths[0].split('/').pop()}"? This cannot be undone.`
+                : `Delete ${paths.length} items? This cannot be undone.`;
+
             try {
-                await fsDelete(item.path);
-                setStatus('', `Deleted ${item.name}`);
-                selectedItem = null;
-                document.getElementById('btn-delete').disabled = true;
+                const ok = (typeof window !== 'undefined' && typeof window.confirm === 'function')
+                    ? window.confirm(label)
+                    : true;
+                if (!ok) return;
+            } catch (e) {
+                setStatus('', `Delete error: ${e.message}`);
+                return;
+            }
+
+            try {
+                for (const p of paths) await fsDelete(p);
+                setStatus('', paths.length === 1 ? 'Deleted 1 item' : `Deleted ${paths.length} items`);
+                clearSelection();
                 loadDir(currentPath);
             } catch (e) {
                 setStatus('', `Delete error: ${e.message}`);
@@ -2004,23 +2367,26 @@
         };
         document.getElementById('btn-home').onclick = () => { historyStack.push(currentPath); loadDir('/'); };
         document.getElementById('btn-refresh').onclick = () => loadDir(currentPath);
-        document.getElementById('btn-delete').onclick = () => { if (selectedItem) deleteItem(selectedItem); };
+        document.getElementById('btn-delete').onclick = async () => {
+            await deleteSelected();
+        };
 
         document.getElementById('btn-grid').onclick = () => { viewMode = 'grid'; renderFiles(); };
         document.getElementById('btn-list').onclick = () => { viewMode = 'list'; renderFiles(); };
         document.getElementById('sort-select').onchange = (e) => { sortMode = e.target.value; renderFiles(); };
 
-        async function fsCopy(srcPath, destDir) {
+        async function fsCopy(srcPath, destDir, opts = {}) {
             srcPath = normPath(srcPath);
             destDir = normPath(destDir);
             const node = await idbGet(srcPath);
             if (!node) throw new Error(`Not found: ${srcPath}`);
             const newPath = normPath(destDir + '/' + node.name);
-            await fsMkdir(destDir);
+            if (opts.ensureDest === false) await fsAssertDirExists(destDir);
+            else await fsMkdir(destDir);
             if (node.is_dir) {
                 await fsMkdir(newPath);
                 const children = await idbGetByParent(srcPath);
-                for (const child of children) await fsCopy(child.path, newPath);
+                for (const child of children) await fsCopy(child.path, newPath, opts);
             } else {
                 await idbPut({ ...node, path: newPath, parent: destDir, created: Date.now(), modified: Date.now() });
             }
@@ -2152,7 +2518,7 @@
                 type: 'function',
                 function: {
                     name: 'write_file',
-                    description: 'Create or overwrite a file with given text content.',
+                    description: 'Create or overwrite a file with given text content. The parent folder must already exist.',
                     parameters: {
                         type: 'object',
                         properties: {
@@ -2182,7 +2548,7 @@
                 type: 'function',
                 function: {
                     name: 'move_file',
-                    description: 'Move a file or directory into a destination folder.',
+                    description: 'Move a file or directory into a destination folder. The destination folder must already exist.',
                     parameters: {
                         type: 'object',
                         properties: {
@@ -2197,7 +2563,7 @@
                 type: 'function',
                 function: {
                     name: 'copy_file',
-                    description: 'Copy a file or directory into a destination folder.',
+                    description: 'Copy a file or directory into a destination folder. The destination folder must already exist.',
                     parameters: {
                         type: 'object',
                         properties: {
@@ -2312,7 +2678,7 @@
                     return text.slice(0, 4000);
                 }
                 case 'write_file': {
-                    await fsWrite(args.path, args.content);
+                    await fsWrite(args.path, args.content, { ensureParent: false });
                     loadDir(currentPath);
                     return 'File written successfully.';
                 }
@@ -2322,7 +2688,7 @@
                     return `Renamed to ${args.new_name}`;
                 }
                 case 'move_file': {
-                    await fsMove(args.source, args.destination);
+                    await fsMove(args.source, args.destination, { ensureDest: false });
                     loadDir(currentPath);
                     return `Moved to ${args.destination}`;
                 }
@@ -2337,7 +2703,7 @@
                     return `Directory created: ${args.path}`;
                 }
                 case 'copy_file': {
-                    await fsCopy(args.source, args.destination);
+                    await fsCopy(args.source, args.destination, { ensureDest: false });
                     loadDir(currentPath);
                     return `Copied to ${args.destination}`;
                 }
@@ -2421,9 +2787,19 @@
             aiDot.classList.add('thinking');
             document.getElementById('ai-thinking').classList.add('visible');
 
-            const sysPrompt = `You are CLIO, an AI file manager agent. Your name is an acronym and also the Greek muse of history and record-keeping. The filesystem is stored locally in the browser (IndexedDB). Paths start from /. The user's current directory is: ${currentPath}.
+            const sysPrompt = `You are CLIO, an AI file manager agent. The filesystem is stored locally in the browser (IndexedDB). Paths start from /. The user's current directory is: ${currentPath}.
 You have tools to list, read, write, rename, copy, move, delete files, search, navigate, and check disk usage.
-You CAN call multiple tools in a single response when performing batch operations (e.g. renaming many files). Always list the directory first if you don't know its contents. Be concise in text responses.`;
+You CAN call multiple tools in a single response when performing batch operations (e.g. renaming many files). Always list the directory first if you don't know its contents. Be concise in text responses. You do NOT have access to markdown so dont use them.
+You are a professional assistant. Communicate with formality, precision, and clarity at all times.
+
+Guidelines:
+- Use formal language. Avoid contractions (write "do not" instead of "don't"), slang, and casual phrasing.
+- Address the user respectfully and maintain a composed, measured tone throughout.
+- Structure responses clearly — lead with the most important information, then provide supporting detail.
+- Be concise and exact. Do not pad responses with filler phrases or unnecessary affirmations.
+- When acknowledging a request, do so briefly before proceeding. Do not over-explain or repeat yourself.
+- Avoid emotional language, colloquialisms, and informal sign-offs.
+`;
 
             conversationHistory.push({ role: 'user', content: userText });
 
