@@ -933,9 +933,9 @@
             background: var(--bg-panel2);
             border: 1px solid var(--border-bright);
             border-radius: 4px;
-            width: 680px;
+            width: 860px;
             max-width: 92vw;
-            max-height: 85vh;
+            max-height: 92vh;
             display: flex;
             flex-direction: column;
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
@@ -980,7 +980,7 @@
             flex: 1;
             border: none;
             background: #fff;
-            min-height: 400px;
+            min-height: 560px;
         }
 
         .chat-embed {
@@ -1030,7 +1030,7 @@
             width: 100%;
             border: none;
             display: block;
-            height: 280px;
+            height: clamp(360px, 52vh, 640px);
             background: #fff;
         }
 
@@ -2799,6 +2799,24 @@ Guidelines:
 - Be concise and exact. Do not pad responses with filler phrases or unnecessary affirmations.
 - When acknowledging a request, do so briefly before proceeding. Do not over-explain or repeat yourself.
 - Avoid emotional language, colloquialisms, and informal sign-offs.
+
+for embeds you can only use these colors:
+            --bg-base: #1a1410;
+            --bg-panel: #211b14;
+            --bg-panel2: #2a2218;
+            --bg-card: #312820;
+            --bg-hover: #3d3025;
+            --border: #4a3820;
+            --border-bright: #5c4830;
+            --orange: #e8720c;
+            --orange-dim: #c05a08;
+            --orange-glow: #ff8c2a;
+            --orange-faint: rgba(232, 114, 12, 0.08);
+            --orange-faint2: rgba(232, 114, 12, 0.15);
+            --text: #e8d5b8;
+            --text-dim: #9a8060;
+            --text-faint: #5a4a35;
+
 `;
 
             conversationHistory.push({ role: 'user', content: userText });
