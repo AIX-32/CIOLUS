@@ -1,0 +1,2568 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIOLUS - AI-Powered File Manager</title>
+    <link rel="icon" type="image/x-icon" href="./favicon.ico">
+
+    <meta name="description" content="AI-powered file manager. CLIO manages your files so you don't have to.">
+    <meta name="author" content="AIX">
+    <meta name="theme-color" content="#e8720c">
+
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="CIOLUS - AI-Powered File Manager">
+    <meta property="og:description" content="AI-powered file manager. CLIO manages your files so you don't have to.">
+    <meta property="og:site_name" content="AIX">
+    <meta property="og:locale" content="en_US">
+
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="CIOLUS - AI-Powered File Manager">
+    <meta name="twitter:description" content="AI-powered file manager. CLIO manages your files so you don't have to.">
+    <meta name="twitter:site" content="@aix">
+    <script src="https://js.puter.com/v2/"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-base: #1a1410;
+            --bg-panel: #211b14;
+            --bg-panel2: #2a2218;
+            --bg-card: #312820;
+            --bg-hover: #3d3025;
+            --border: #4a3820;
+            --border-bright: #5c4830;
+            --orange: #e8720c;
+            --orange-dim: #c05a08;
+            --orange-glow: #ff8c2a;
+            --orange-faint: rgba(232, 114, 12, 0.08);
+            --orange-faint2: rgba(232, 114, 12, 0.15);
+            --text: #e8d5b8;
+            --text-dim: #9a8060;
+            --text-faint: #5a4a35;
+            --green: #7aad5a;
+            --red: #c05040;
+            --blue: #5a90b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Chakra Petch', sans-serif;
+            background: var(--bg-base);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            background-size: 180px 180px;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.6;
+        }
+
+
+        #topbar {
+            height: 48px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 16px;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        #topbar::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--orange-dim), transparent);
+            opacity: 0.4;
+        }
+
+        .logo {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--orange);
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+        }
+
+        .logo span {
+            color: var(--text-dim);
+            font-weight: 300;
+        }
+
+        #topbar-path {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--text-dim);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 3px 10px;
+            border-radius: 2px;
+            flex: 1;
+            max-width: 480px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .topbar-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .topbar-btn {
+            font-family: 'Chakra Petch', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-dim);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .topbar-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text);
+            border-color: var(--border-bright);
+        }
+
+        .topbar-btn.primary {
+            border-color: var(--orange-dim);
+            color: var(--orange);
+        }
+
+        .topbar-btn.primary:hover {
+            background: var(--orange-faint2);
+        }
+
+
+        #main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+
+        #filebrowser {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg-base);
+        }
+
+        #fb-toolbar {
+            height: 46px;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-panel);
+            flex-shrink: 0;
+        }
+
+        .fb-btn {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-dim);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.12s;
+        }
+
+        .fb-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text);
+        }
+
+        .fb-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .fb-btn.danger:hover {
+            border-color: var(--red);
+            color: var(--red);
+            background: rgba(192, 80, 64, 0.08);
+        }
+
+        #fb-view-toggle {
+            margin-left: auto;
+            display: flex;
+            gap: 4px;
+        }
+
+        #fb-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        #fb-content::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #fb-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #fb-content::-webkit-scrollbar-thumb {
+            background: var(--border-bright);
+            border-radius: 2px;
+        }
+
+
+        #file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 10px;
+        }
+
+        .file-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 8px 12px;
+            border: 1px solid transparent;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.12s;
+            position: relative;
+        }
+
+        .file-item:hover {
+            background: var(--bg-card);
+            border-color: var(--border);
+        }
+
+        .file-item.selected {
+            background: var(--orange-faint2);
+            border-color: var(--orange-dim);
+        }
+
+        .file-icon {
+            font-size: 32px;
+            line-height: 1;
+            margin-bottom: 8px;
+            color: var(--text-dim);
+        }
+
+        .file-item.selected .file-icon {
+            color: var(--orange);
+        }
+
+        .file-name {
+            font-size: 11px;
+            text-align: center;
+            color: var(--text);
+            word-break: break-all;
+            max-height: 32px;
+            overflow: hidden;
+            line-height: 1.3;
+        }
+
+        .file-item.selected .file-name {
+            color: var(--orange-glow);
+        }
+
+
+        #file-list {
+            display: none;
+        }
+
+        .list-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border: 1px solid transparent;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .list-item:hover {
+            background: var(--bg-card);
+            border-color: var(--border);
+        }
+
+        .list-item.selected {
+            background: var(--orange-faint2);
+            border-color: var(--orange-dim);
+        }
+
+        .list-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            color: var(--text-dim);
+        }
+
+        .list-item.selected .list-icon {
+            color: var(--orange);
+        }
+
+        .list-name {
+            font-size: 13px;
+            flex: 1;
+        }
+
+        .list-meta {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-faint);
+        }
+
+        .view-grid #file-grid {
+            display: grid;
+        }
+
+        .view-grid #file-list {
+            display: none;
+        }
+
+        .view-list #file-grid {
+            display: none;
+        }
+
+        .view-list #file-list {
+            display: block;
+        }
+
+
+        .fb-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 10px;
+            color: var(--text-faint);
+            font-size: 13px;
+        }
+
+        .fb-state .icon {
+            font-size: 36px;
+            opacity: 0.4;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--orange);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+
+        #sort-select {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 5px 8px;
+            border-radius: 2px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.12s;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a4a35'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 24px;
+        }
+
+        #sort-select:hover,
+        #sort-select:focus {
+            border-color: var(--orange-dim);
+            color: var(--text);
+        }
+
+        #sort-select option {
+            background: var(--bg-panel2);
+            color: var(--text);
+        }
+
+
+        #ai-thinking {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--bg-base);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        #ai-thinking.visible {
+            display: flex;
+        }
+
+        .think-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-bright);
+            border-top-color: var(--orange);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            flex-shrink: 0;
+        }
+
+        #think-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-dim);
+            flex: 1;
+        }
+
+        #think-dots::after {
+            content: '';
+            animation: dots 1.4s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0% {
+                content: '';
+            }
+
+            25% {
+                content: '.';
+            }
+
+            50% {
+                content: '..';
+            }
+
+            75% {
+                content: '...';
+            }
+
+            100% {
+                content: '';
+            }
+        }
+
+        #think-stop {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            padding: 3px 8px;
+            background: transparent;
+            border: 1px solid var(--border-bright);
+            color: var(--text-faint);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        #think-stop:hover {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+
+        #ctx-menu {
+            position: fixed;
+            background: var(--bg-panel2);
+            border: 1px solid var(--border-bright);
+            border-radius: 3px;
+            padding: 4px 0;
+            z-index: 1000;
+            min-width: 170px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+
+        .ctx-item {
+            padding: 7px 14px;
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.1s;
+        }
+
+        .ctx-item:hover {
+            background: var(--bg-hover);
+            color: var(--orange);
+        }
+
+        .ctx-item.danger:hover {
+            color: var(--red);
+            background: rgba(192, 80, 64, 0.1);
+        }
+
+        .ctx-sep {
+            height: 1px;
+            background: var(--border);
+            margin: 3px 0;
+        }
+
+        /* ctx-item for dir-only: hidden by default, shown via JS */
+        .ctx-item.dir-only { display: none; }
+        .ctx-item.file-only { display: none; }
+
+
+        #statusbar {
+            height: 28px;
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 16px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-faint);
+            flex-shrink: 0;
+        }
+
+        #status-count {
+            color: var(--text-dim);
+        }
+
+        #status-msg {
+            color: var(--orange-dim);
+        }
+
+        #status-user {
+            margin-left: auto;
+            color: var(--text-faint);
+        }
+
+
+        #sidebar {
+            width: 360px;
+            flex-shrink: 0;
+            border-left: 1px solid var(--border);
+            background: var(--bg-panel);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #sidebar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 2px;
+            height: 100%;
+            background: linear-gradient(180deg, transparent, var(--orange-dim), transparent);
+            opacity: 0.3;
+        }
+
+        #sidebar-header {
+            height: 46px;
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+            border-bottom: 1px solid var(--border);
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-title {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            color: var(--orange);
+            text-transform: uppercase;
+        }
+
+        .ai-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--orange);
+            box-shadow: 0 0 6px var(--orange);
+            animation: pulse 2s ease-in-out infinite;
+            margin-left: auto;
+        }
+
+        .ai-dot.thinking {
+            background: var(--text-dim);
+            box-shadow: 0 0 4px var(--text-dim);
+            animation: thinking-pulse 0.4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        @keyframes thinking-pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.4);
+                opacity: 0.4;
+            }
+        }
+
+        /* Clear chat button */
+        #btn-clear-chat {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            padding: 3px 8px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-faint);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.15s;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+
+        #btn-clear-chat:hover {
+            border-color: var(--border-bright);
+            color: var(--text-dim);
+            background: var(--bg-hover);
+        }
+
+        #chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #chat-messages::-webkit-scrollbar {
+            width: 3px;
+        }
+
+        #chat-messages::-webkit-scrollbar-thumb {
+            background: var(--border-bright);
+        }
+
+        .msg {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            animation: msgIn 0.2s ease-out;
+        }
+
+        @keyframes msgIn {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        .msg-role {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+
+        .msg.user .msg-role {
+            color: var(--orange-dim);
+        }
+
+        .msg.ai .msg-role {
+            color: var(--text-faint);
+        }
+
+        .msg-body {
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 10px 12px;
+        }
+
+        .msg.user .msg-body {
+            background: var(--orange-faint);
+            border-color: var(--orange-dim);
+            color: var(--text);
+        }
+
+        .msg.ai .msg-body {
+            color: var(--text);
+        }
+
+
+        .tool-call {
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-left: 2px solid var(--orange-dim);
+            border-radius: 2px;
+            padding: 6px 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+            animation: msgIn 0.2s ease-out;
+        }
+
+        .tool-call .tc-name {
+            color: var(--orange);
+            font-weight: 500;
+        }
+
+        .tool-call .tc-args {
+            color: var(--text-faint);
+            margin-top: 2px;
+        }
+
+        .tool-call.success .tc-name {
+            color: var(--green);
+        }
+
+        .tool-call.error .tc-name {
+            color: var(--red);
+        }
+
+        #chat-input-area {
+            padding: 10px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+            background: var(--bg-panel2);
+        }
+
+        #chat-input {
+            flex: 1;
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 10px 12px;
+            font-family: 'Chakra Petch', sans-serif;
+            font-size: 13px;
+            color: var(--text);
+            resize: none;
+            height: 72px;
+            transition: border-color 0.15s;
+            outline: none;
+        }
+
+        #chat-input:focus {
+            border-color: var(--orange-dim);
+        }
+
+        #chat-input::placeholder {
+            color: var(--text-faint);
+        }
+
+        #send-btn {
+            width: 36px;
+            background: var(--orange-faint2);
+            border: 1px solid var(--orange-dim);
+            border-radius: 2px;
+            color: var(--orange);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #send-btn:hover {
+            background: var(--orange-dim);
+            color: var(--bg-base);
+        }
+
+        #send-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+
+        #embed-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 700;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #embed-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 700;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #embed-modal.open {
+            display: flex;
+        }
+
+        #embed-box {
+            background: var(--bg-panel2);
+            border: 1px solid var(--border-bright);
+            border-radius: 4px;
+            width: 680px;
+            max-width: 92vw;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+        }
+
+        #embed-titlebar {
+            height: 38px;
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+            border-bottom: 1px solid var(--border);
+            gap: 10px;
+            flex-shrink: 0;
+            background: var(--bg-panel);
+        }
+
+        #embed-title-text {
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--orange);
+            flex: 1;
+            letter-spacing: 0.1em;
+        }
+
+        #embed-close {
+            background: none;
+            border: none;
+            color: var(--text-faint);
+            font-size: 15px;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 2px;
+            transition: color 0.1s;
+        }
+
+        #embed-close:hover {
+            color: var(--red);
+        }
+
+        #embed-frame {
+            flex: 1;
+            border: none;
+            background: #fff;
+            min-height: 400px;
+        }
+
+        .chat-embed {
+            margin-top: 6px;
+            border: 1px solid var(--border-bright);
+            border-left: 3px solid var(--orange-dim);
+            border-radius: 3px;
+            overflow: hidden;
+            background: var(--bg-base);
+        }
+
+        .chat-embed-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.1s;
+            user-select: none;
+        }
+
+        .chat-embed-header:hover {
+            background: var(--bg-hover);
+        }
+
+        .chat-embed-icon {
+            color: var(--orange);
+            font-size: 12px;
+        }
+
+        .chat-embed-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-dim);
+            flex: 1;
+            letter-spacing: 0.05em;
+        }
+
+        .chat-embed-expand {
+            color: var(--text-faint);
+            font-size: 10px;
+        }
+
+        .chat-embed iframe {
+            width: 100%;
+            border: none;
+            display: block;
+            height: 280px;
+            background: #fff;
+        }
+
+
+
+        #editor-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 500;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #editor-modal.open {
+            display: flex;
+        }
+
+        #editor-box {
+            background: var(--bg-panel2);
+            border: 1px solid var(--border-bright);
+            border-radius: 4px;
+            width: 640px;
+            max-width: 90vw;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        }
+
+        #editor-titlebar {
+            height: 36px;
+            display: flex;
+            align-items: center;
+            padding: 0 14px;
+            border-bottom: 1px solid var(--border);
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        #editor-filename {
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--orange);
+            flex: 1;
+        }
+
+        #editor-close {
+            background: none;
+            border: none;
+            color: var(--text-faint);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 2px;
+            transition: color 0.1s;
+        }
+
+        #editor-close:hover {
+            color: var(--red);
+        }
+
+        #editor-textarea {
+            flex: 1;
+            background: var(--bg-base);
+            border: none;
+            padding: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text);
+            resize: none;
+            outline: none;
+            min-height: 300px;
+            overflow-y: auto;
+        }
+
+        #editor-footer {
+            height: 36px;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            gap: 8px;
+            border-top: 1px solid var(--border);
+            justify-content: flex-end;
+        }
+
+
+        #rename-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 600;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #rename-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 600;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #rename-modal.open {
+            display: flex;
+        }
+
+        #rename-box {
+            background: var(--bg-panel2);
+            border: 1px solid var(--border-bright);
+            border-radius: 3px;
+            padding: 20px;
+            width: 340px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        #rename-box h3 {
+            font-size: 12px;
+            color: var(--orange);
+            letter-spacing: 0.1em;
+            margin-bottom: 12px;
+        }
+
+        #rename-input {
+            width: 100%;
+            background: var(--bg-base);
+            border: 1px solid var(--border-bright);
+            border-radius: 2px;
+            padding: 8px 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text);
+            outline: none;
+            margin-bottom: 12px;
+        }
+
+        #rename-input:focus {
+            border-color: var(--orange-dim);
+        }
+
+        .rename-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+
+        #move-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 600;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #move-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 600;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #move-modal.open {
+            display: flex;
+        }
+
+        #move-box {
+            background: var(--bg-panel2);
+            border: 1px solid var(--border-bright);
+            border-radius: 3px;
+            padding: 20px;
+            width: 380px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        #move-box h3 {
+            font-size: 12px;
+            color: var(--orange);
+            letter-spacing: 0.1em;
+            margin-bottom: 12px;
+        }
+
+        #move-input {
+            width: 100%;
+            background: var(--bg-base);
+            border: 1px solid var(--border-bright);
+            border-radius: 2px;
+            padding: 8px 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text);
+            outline: none;
+            margin-bottom: 4px;
+        }
+
+        #move-input:focus {
+            border-color: var(--orange-dim);
+        }
+
+        #move-hint {
+            font-size: 10px;
+            color: var(--text-faint);
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="topbar">
+        <span class="logo">CIOLUS<span> / FILES</span></span>
+        <div id="topbar-path">~/</div>
+        <div class="topbar-actions">
+            <button class="topbar-btn" id="btn-new-folder"><i class="fa fa-folder-plus"></i> NEW FOLDER</button>
+            <button class="topbar-btn primary" id="btn-upload"><i class="fa fa-file-arrow-up"></i> UPLOAD FILES</button>
+            <button class="topbar-btn primary" id="btn-upload-folder"><i class="fa fa-folder-arrow-up"></i> UPLOAD
+                FOLDER</button>
+            <input type="file" id="upload-input" multiple style="display:none">
+            <input type="file" id="upload-folder-input" webkitdirectory multiple style="display:none">
+        </div>
+    </div>
+
+    <div id="main">
+
+        <div id="filebrowser">
+            <div id="fb-toolbar">
+                <button class="fb-btn" id="btn-back"><i class="fa-solid fa-arrow-left"></i> BACK</button>
+                <button class="fb-btn" id="btn-home"><i class="fa-solid fa-house"></i> HOME</button>
+                <button class="fb-btn" id="btn-refresh"><i class="fa-solid fa-rotate-right"></i> REFRESH</button>
+                <button class="fb-btn danger" id="btn-delete" disabled><i class="fa-solid fa-trash"></i> DELETE</button>
+                <select id="sort-select" title="Sort order">
+                    <option value="name-asc">Name A–Z</option>
+                    <option value="name-desc">Name Z–A</option>
+                    <option value="modified-desc">Recent first</option>
+                    <option value="modified-asc">Oldest first</option>
+                    <option value="size-desc">Biggest first</option>
+                    <option value="size-asc">Smallest first</option>
+                    <option value="type">Type / Kind</option>
+                </select>
+                <div id="fb-view-toggle">
+                    <button class="fb-btn" id="btn-grid" title="Grid"><i class="fa-solid fa-grip"></i></button>
+                    <button class="fb-btn" id="btn-list" title="List"><i class="fa-solid fa-list"></i></button>
+                </div>
+            </div>
+            <div id="fb-content" class="view-grid">
+                <div class="fb-state">
+                    <div class="spinner"></div>
+                    <span>Loading files…</span>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="sidebar">
+            <div id="sidebar-header">
+                <span class="sidebar-title">CLIO</span>
+                <button id="btn-clear-chat" title="Clear chat history"><i class="fa-solid fa-broom"></i> CLEAR</button>
+                <div class="ai-dot" id="ai-indicator"></div>
+            </div>
+            <div id="chat-messages">
+                <div class="msg ai">
+                    <span class="msg-role">CLIO</span>
+                    <div class="msg-body">Ready. Files are stored locally in your browser. I can list, open, edit,
+                        rename, move, copy, search, and delete files — ask me anything.</div>
+                </div>
+            </div>
+            <div id="ai-thinking">
+                <div class="think-spinner"></div>
+                <span id="think-label">Thinking<span id="think-dots"></span></span>
+                <button id="think-stop" title="Cancel"><i class="fa-solid fa-stop"></i></button>
+            </div>
+            <div id="chat-input-area">
+                <textarea id="chat-input" placeholder="Ask CLIO to manage your files…" rows="3"></textarea>
+                <button id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusbar">
+        <span id="status-count">—</span>
+        <span id="status-msg"></span>
+        <span id="status-user" id="status-user">—</span>
+    </div>
+
+    <div id="ctx-menu">
+        <div class="ctx-item" data-action="open"><i class="fa-solid fa-folder-open fa-fw"></i> Open</div>
+        <div class="ctx-item" data-action="edit"><i class="fa-solid fa-pen fa-fw"></i> Edit</div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" data-action="rename"><i class="fa-solid fa-i-cursor fa-fw"></i> Rename</div>
+        <div class="ctx-item" data-action="move"><i class="fa-solid fa-file-export fa-fw"></i> Move to…</div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item file-only" data-action="download-file"><i class="fa-solid fa-download fa-fw"></i> Download</div>
+        <div class="ctx-item dir-only" data-action="download-folder"><i class="fa-solid fa-file-zipper fa-fw"></i> Download as ZIP</div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item danger" data-action="delete"><i class="fa-solid fa-trash fa-fw"></i> Delete</div>
+    </div>
+
+    <div id="embed-modal">
+        <div id="embed-box">
+            <div id="embed-titlebar">
+                <span id="embed-title-text">EMBED</span>
+                <button id="embed-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <iframe id="embed-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+    </div>
+
+    <div id="editor-modal">
+        <div id="editor-box">
+            <div id="editor-titlebar">
+                <span id="editor-filename">untitled</span>
+                <button id="editor-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <textarea id="editor-textarea" spellcheck="false"></textarea>
+            <div id="editor-footer">
+                <button class="fb-btn" id="btn-cancel-edit">CANCEL</button>
+                <button class="topbar-btn primary" id="btn-save-edit">SAVE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="rename-modal">
+        <div id="rename-box">
+            <h3>RENAME FILE</h3>
+            <input type="text" id="rename-input" placeholder="new-name.txt">
+            <div class="rename-actions">
+                <button class="fb-btn" id="btn-cancel-rename">CANCEL</button>
+                <button class="topbar-btn primary" id="btn-confirm-rename">RENAME</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="move-modal">
+        <div id="move-box">
+            <h3>MOVE TO PATH</h3>
+            <input type="text" id="move-input" placeholder="~/Documents">
+            <div id="move-hint">Enter destination folder path</div>
+            <div class="rename-actions">
+                <button class="fb-btn" id="btn-cancel-move">CANCEL</button>
+                <button class="topbar-btn primary" id="btn-confirm-move">MOVE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        const DB_NAME = 'vault_fs';
+        const DB_VERSION = 1;
+        let db = null;
+
+        function idbOpen() {
+            return new Promise((res, rej) => {
+                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = e => {
+                    const d = e.target.result;
+                    if (!d.objectStoreNames.contains('nodes')) {
+                        const store = d.createObjectStore('nodes', { keyPath: 'path' });
+                        store.createIndex('parent', 'parent', { unique: false });
+                    }
+                };
+                req.onsuccess = e => res(e.target.result);
+                req.onerror = e => rej(e.target.error);
+            });
+        }
+
+        function idbTx(mode = 'readonly') {
+            return db.transaction('nodes', mode).objectStore('nodes');
+        }
+
+        function idbGet(path) {
+            return new Promise((res, rej) => {
+                const r = idbTx().get(path);
+                r.onsuccess = e => res(e.target.result || null);
+                r.onerror = e => rej(e.target.error);
+            });
+        }
+
+        function idbPut(node) {
+            return new Promise((res, rej) => {
+                const r = idbTx('readwrite').put(node);
+                r.onsuccess = () => res();
+                r.onerror = e => rej(e.target.error);
+            });
+        }
+
+        function idbDelete(path) {
+            return new Promise((res, rej) => {
+                const r = idbTx('readwrite').delete(path);
+                r.onsuccess = () => res();
+                r.onerror = e => rej(e.target.error);
+            });
+        }
+
+        function idbGetByParent(parent) {
+            return new Promise((res, rej) => {
+                const store = idbTx();
+                const idx = store.index('parent');
+                const r = idx.getAll(parent);
+                r.onsuccess = e => res(e.target.result || []);
+                r.onerror = e => rej(e.target.error);
+            });
+        }
+
+        function idbGetAll() {
+            return new Promise((res, rej) => {
+                const r = idbTx().getAll();
+                r.onsuccess = e => res(e.target.result || []);
+                r.onerror = e => rej(e.target.error);
+            });
+        }
+
+        function normPath(p) {
+            const parts = p.replace(/\/+/g, '/').split('/').filter(Boolean);
+            const out = [];
+            for (const part of parts) {
+                if (part === '.') continue;
+                if (part === '..') out.pop();
+                else out.push(part);
+            }
+            return '/' + out.join('/');
+        }
+
+        function parentOf(path) {
+            const p = path.replace(/\/$/, '');
+            const i = p.lastIndexOf('/');
+            return i <= 0 ? '/' : p.slice(0, i);
+        }
+
+        function nameOf(path) {
+            return path.replace(/\/$/, '').split('/').pop();
+        }
+
+        async function fsEnsureRoot() {
+            const root = await idbGet('/');
+            if (!root) {
+                await idbPut({ path: '/', name: '', is_dir: true, parent: null, content: null, size: 0, created: Date.now(), modified: Date.now() });
+            }
+        }
+
+        async function fsReaddir(path) {
+            path = normPath(path);
+            const node = await idbGet(path);
+            if (!node) throw new Error(`Not found: ${path}`);
+            if (!node.is_dir) throw new Error(`Not a directory: ${path}`);
+            const children = await idbGetByParent(path);
+            return children;
+        }
+
+        async function fsMkdir(path) {
+            path = normPath(path);
+            const existing = await idbGet(path);
+            if (existing) return existing;
+            const parent = parentOf(path);
+            await idbPut({ path, name: nameOf(path), is_dir: true, parent, content: null, size: 0, created: Date.now(), modified: Date.now() });
+            return await idbGet(path);
+        }
+
+        async function fsWrite(path, content) {
+            path = normPath(path);
+            const parent = parentOf(path);
+            if (parent !== path) await fsMkdir(parent);
+            let buf;
+            if (typeof content === 'string') {
+                buf = new TextEncoder().encode(content).buffer;
+            } else if (content instanceof ArrayBuffer) {
+                buf = content;
+            } else if (content instanceof Blob || content instanceof File) {
+                buf = await content.arrayBuffer();
+            } else {
+                buf = content;
+            }
+            const size = buf ? buf.byteLength : 0;
+            const existing = await idbGet(path);
+            await idbPut({ path, name: nameOf(path), is_dir: false, parent, content: buf, size, created: existing ? existing.created : Date.now(), modified: Date.now() });
+        }
+
+        async function fsRead(path) {
+            path = normPath(path);
+            const node = await idbGet(path);
+            if (!node) throw new Error(`Not found: ${path}`);
+            return node.content ? new TextDecoder().decode(node.content) : '';
+        }
+
+        async function fsReadBinary(path) {
+            path = normPath(path);
+            const node = await idbGet(path);
+            if (!node) throw new Error(`Not found: ${path}`);
+            return node.content || new ArrayBuffer(0);
+        }
+
+        async function fsRename(path, newName) {
+            path = normPath(path);
+            const node = await idbGet(path);
+            if (!node) throw new Error(`Not found: ${path}`);
+            const newPath = parentOf(path) + '/' + newName;
+            await idbDelete(path);
+            node.path = normPath(newPath);
+            node.name = newName;
+            await idbPut(node);
+            if (node.is_dir) await fsUpdateChildren(path, node.path);
+        }
+
+        async function fsUpdateChildren(oldParent, newParent) {
+            const children = await idbGetByParent(oldParent);
+            for (const child of children) {
+                const oldPath = child.path;
+                const newPath = newParent + '/' + child.name;
+                await idbDelete(oldPath);
+                child.path = normPath(newPath);
+                child.parent = newParent;
+                await idbPut(child);
+                if (child.is_dir) await fsUpdateChildren(oldPath, child.path);
+            }
+        }
+
+        async function fsMove(srcPath, destPath) {
+            srcPath = normPath(srcPath);
+            destPath = normPath(destPath);
+            const node = await idbGet(srcPath);
+            if (!node) throw new Error(`Not found: ${srcPath}`);
+            const newPath = normPath(destPath + '/' + node.name);
+            await fsMkdir(destPath);
+            await idbDelete(srcPath);
+            node.path = newPath;
+            node.parent = destPath;
+            await idbPut(node);
+            if (node.is_dir) await fsUpdateChildren(srcPath, newPath);
+        }
+
+        async function fsDelete(path) {
+            path = normPath(path);
+            const node = await idbGet(path);
+            if (!node) return;
+            if (node.is_dir) {
+                const children = await idbGetByParent(path);
+                for (const c of children) await fsDelete(c.path);
+            }
+            await idbDelete(path);
+        }
+
+        // ── Download helpers ──────────────────────────────────────────────────────
+
+        function triggerDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+
+        async function downloadFile(item) {
+            try {
+                const buf = await fsReadBinary(item.path);
+                const blob = new Blob([buf]);
+                triggerDownload(blob, item.name);
+                setStatus('', `Downloaded ${item.name}`);
+            } catch (e) {
+                setStatus('', `Download error: ${e.message}`);
+            }
+        }
+
+        // Recursively collect all files under a directory for ZIP building
+        async function collectFilesRecursive(dirPath, zipRelBase) {
+            const entries = [];
+            const children = await idbGetByParent(normPath(dirPath));
+            for (const child of children) {
+                const relPath = zipRelBase ? zipRelBase + '/' + child.name : child.name;
+                if (child.is_dir) {
+                    const sub = await collectFilesRecursive(child.path, relPath);
+                    entries.push(...sub);
+                } else {
+                    entries.push({ node: child, relPath });
+                }
+            }
+            return entries;
+        }
+
+        // Minimal ZIP builder (store + deflate via CompressionStream where available)
+        async function buildZip(entries) {
+            // We'll use the store method (no compression) for broad compatibility.
+            // Format: local file header + data, then central directory, then EOCD.
+            const enc = new TextEncoder();
+
+            function u16le(n) {
+                const b = new Uint8Array(2);
+                new DataView(b.buffer).setUint16(0, n, true);
+                return b;
+            }
+            function u32le(n) {
+                const b = new Uint8Array(4);
+                new DataView(b.buffer).setUint32(0, n, true);
+                return b;
+            }
+
+            // CRC-32 table
+            const crcTable = (() => {
+                const t = new Uint32Array(256);
+                for (let i = 0; i < 256; i++) {
+                    let c = i;
+                    for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                    t[i] = c;
+                }
+                return t;
+            })();
+
+            function crc32(buf) {
+                const bytes = new Uint8Array(buf);
+                let crc = 0xFFFFFFFF;
+                for (const b of bytes) crc = crcTable[(crc ^ b) & 0xFF] ^ (crc >>> 8);
+                return (crc ^ 0xFFFFFFFF) >>> 0;
+            }
+
+            const chunks = [];
+            const centralDir = [];
+            let offset = 0;
+
+            const dosDate = (() => {
+                const now = new Date();
+                const d = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+                const t = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+                return { d, t };
+            })();
+
+            for (const { node, relPath } of entries) {
+                const nameBuf = enc.encode(relPath);
+                const dataBuf = node.content ? new Uint8Array(node.content) : new Uint8Array(0);
+                const crc = crc32(dataBuf);
+                const size = dataBuf.byteLength;
+
+                // Local file header
+                const lfh = new Uint8Array([
+                    0x50, 0x4B, 0x03, 0x04, // sig
+                    20, 0,                   // version needed
+                    0, 0,                    // flags
+                    0, 0,                    // compression (store)
+                    ...u16le(dosDate.t),
+                    ...u16le(dosDate.d),
+                    ...u32le(crc),
+                    ...u32le(size),
+                    ...u32le(size),
+                    ...u16le(nameBuf.length),
+                    0, 0,                    // extra length
+                ]);
+
+                const localOffset = offset;
+                chunks.push(lfh, nameBuf, dataBuf);
+                offset += lfh.byteLength + nameBuf.byteLength + dataBuf.byteLength;
+
+                // Central directory entry
+                const cde = new Uint8Array([
+                    0x50, 0x4B, 0x01, 0x02, // sig
+                    20, 0,                   // version made by
+                    20, 0,                   // version needed
+                    0, 0,                    // flags
+                    0, 0,                    // compression
+                    ...u16le(dosDate.t),
+                    ...u16le(dosDate.d),
+                    ...u32le(crc),
+                    ...u32le(size),
+                    ...u32le(size),
+                    ...u16le(nameBuf.length),
+                    0, 0,                    // extra
+                    0, 0,                    // comment
+                    0, 0,                    // disk start
+                    0, 0,                    // int attrs
+                    0, 0, 0, 0,              // ext attrs
+                    ...u32le(localOffset),
+                ]);
+                centralDir.push(cde, nameBuf);
+            }
+
+            const cdOffset = offset;
+            const cdSize = centralDir.reduce((s, b) => s + b.byteLength, 0);
+
+            // End of central directory
+            const eocd = new Uint8Array([
+                0x50, 0x4B, 0x05, 0x06,
+                0, 0,
+                0, 0,
+                ...u16le(entries.length),
+                ...u16le(entries.length),
+                ...u32le(cdSize),
+                ...u32le(cdOffset),
+                0, 0,
+            ]);
+
+            const all = [...chunks, ...centralDir, eocd];
+            const total = all.reduce((s, b) => s + b.byteLength, 0);
+            const out = new Uint8Array(total);
+            let pos = 0;
+            for (const b of all) { out.set(b, pos); pos += b.byteLength; }
+            return out.buffer;
+        }
+
+        async function downloadFolder(item) {
+            setStatus('', `Zipping ${item.name}…`);
+            try {
+                const entries = await collectFilesRecursive(item.path, item.name);
+                if (entries.length === 0) {
+                    setStatus('', `Folder is empty`);
+                    return;
+                }
+                const zipBuf = await buildZip(entries);
+                const blob = new Blob([zipBuf], { type: 'application/zip' });
+                triggerDownload(blob, item.name + '.zip');
+                setStatus('', `Downloaded ${item.name}.zip (${entries.length} files)`);
+            } catch (e) {
+                setStatus('', `ZIP error: ${e.message}`);
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────
+
+        let currentPath = '/';
+        let files = [];
+        let selectedItem = null;
+        let viewMode = 'grid';
+        let sortMode = 'name-asc';
+        let historyStack = [];
+        let editingPath = null;
+        let renamingItem = null;
+        let movingItem = null;
+        let conversationHistory = [];
+        let isAIBusy = false;
+        let aiAbortFlag = false;
+
+        const fbContent = document.getElementById('fb-content');
+        const pathDisplay = document.getElementById('topbar-path');
+        const statusCount = document.getElementById('status-count');
+        const statusMsg = document.getElementById('status-msg');
+        const statusUser = document.getElementById('status-user');
+        const ctxMenu = document.getElementById('ctx-menu');
+        const aiDot = document.getElementById('ai-indicator');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        function getIconClass(item) {
+            if (item.is_dir) return 'fa-solid fa-folder';
+            const ext = (item.name || '').split('.').pop().toLowerCase();
+            const map = {
+                txt: 'fa-solid fa-file-lines', md: 'fa-solid fa-file-lines',
+                js: 'fa-brands fa-js', ts: 'fa-brands fa-js', jsx: 'fa-brands fa-react', tsx: 'fa-brands fa-react',
+                html: 'fa-brands fa-html5', css: 'fa-brands fa-css3-alt',
+                json: 'fa-solid fa-file-code', xml: 'fa-solid fa-file-code',
+                py: 'fa-brands fa-python', sh: 'fa-solid fa-terminal',
+                jpg: 'fa-solid fa-file-image', jpeg: 'fa-solid fa-file-image',
+                png: 'fa-solid fa-file-image', gif: 'fa-solid fa-file-image',
+                webp: 'fa-solid fa-file-image', svg: 'fa-solid fa-file-image',
+                mp3: 'fa-solid fa-file-audio', wav: 'fa-solid fa-file-audio',
+                mp4: 'fa-solid fa-file-video', mov: 'fa-solid fa-file-video',
+                pdf: 'fa-solid fa-file-pdf',
+                zip: 'fa-solid fa-file-zipper', tar: 'fa-solid fa-file-zipper', gz: 'fa-solid fa-file-zipper',
+                csv: 'fa-solid fa-file-csv',
+            };
+            return map[ext] || 'fa-solid fa-file';
+        }
+
+        function getIconColor(item) {
+            if (item.is_dir) return 'var(--orange-dim)';
+            const ext = (item.name || '').split('.').pop().toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return '#7aad8a';
+            if (['mp3', 'wav', 'mp4', 'mov'].includes(ext)) return '#7a9aad';
+            if (['pdf'].includes(ext)) return '#c06050';
+            if (['zip', 'tar', 'gz'].includes(ext)) return '#a08050';
+            if (['js', 'ts', 'jsx', 'tsx', 'py', 'sh', 'json', 'xml', 'html', 'css'].includes(ext)) return '#8a9ad0';
+            return 'var(--text-dim)';
+        }
+
+        function formatSize(bytes) {
+            if (!bytes) return '';
+            if (bytes < 1024) return bytes + 'B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + 'K';
+            return (bytes / 1048576).toFixed(1) + 'M';
+        }
+
+        async function loadDir(path) {
+            fbContent.innerHTML = `<div class="fb-state"><div class="spinner"></div><span>Loading…</span></div>`;
+            setStatus('', `Loading ${path}…`);
+            try {
+                const items = await fsReaddir(path);
+                files = items;
+                currentPath = path;
+                pathDisplay.textContent = path;
+                renderFiles();
+                setStatus(`${items.length} items`, '');
+            } catch (e) {
+                fbContent.innerHTML = `<div class="fb-state"><i class="fa-solid fa-triangle-exclamation" style="font-size:28px;opacity:0.5"></i><span>Error: ${e.message}</span></div>`;
+                setStatus('', `Error: ${e.message}`);
+            }
+        }
+
+        function renderFiles() {
+            fbContent.className = 'view-' + viewMode;
+            fbContent.innerHTML = '';
+            if (files.length === 0) {
+                fbContent.innerHTML = `<div class="fb-state"><i class="fa-regular fa-folder-open" style="font-size:40px;opacity:0.3"></i><span>Empty directory</span></div>`;
+                return;
+            }
+
+            const sorted = [...files].sort((a, b) => {
+                const dirBoost = (x) => x.is_dir ? 0 : 1;
+                switch (sortMode) {
+                    case 'name-asc':
+                        if (a.is_dir !== b.is_dir) return dirBoost(a) - dirBoost(b);
+                        return a.name.localeCompare(b.name);
+                    case 'name-desc':
+                        if (a.is_dir !== b.is_dir) return dirBoost(a) - dirBoost(b);
+                        return b.name.localeCompare(a.name);
+                    case 'modified-desc':
+                        return (b.modified || 0) - (a.modified || 0);
+                    case 'modified-asc':
+                        return (a.modified || 0) - (b.modified || 0);
+                    case 'size-desc':
+                        return (b.size || 0) - (a.size || 0);
+                    case 'size-asc':
+                        if (a.is_dir !== b.is_dir) return dirBoost(a) - dirBoost(b);
+                        return (a.size || 0) - (b.size || 0);
+                    case 'type': {
+                        if (a.is_dir !== b.is_dir) return dirBoost(a) - dirBoost(b);
+                        const extA = a.name.split('.').pop().toLowerCase();
+                        const extB = b.name.split('.').pop().toLowerCase();
+                        return extA.localeCompare(extB) || a.name.localeCompare(b.name);
+                    }
+                    default:
+                        return a.name.localeCompare(b.name);
+                }
+            });
+
+            const grid = document.createElement('div');
+            grid.id = 'file-grid';
+
+            const list = document.createElement('div');
+            list.id = 'file-list';
+
+            sorted.forEach(item => {
+                const iconClass = getIconClass(item);
+                const iconColor = getIconColor(item);
+
+                const gEl = document.createElement('div');
+                gEl.className = 'file-item';
+                gEl.dataset.path = item.path;
+                gEl.dataset.name = item.name;
+                gEl.dataset.isDir = item.is_dir;
+                gEl.innerHTML = `<div class="file-icon"><i class="${iconClass}" style="color:${iconColor}"></i></div><div class="file-name">${item.name}</div>`;
+                gEl.addEventListener('click', e => handleFileClick(e, item, gEl));
+                gEl.addEventListener('dblclick', () => handleFileOpen(item));
+                gEl.addEventListener('contextmenu', e => showCtxMenu(e, item));
+                grid.appendChild(gEl);
+
+                const lEl = document.createElement('div');
+                lEl.className = 'list-item';
+                lEl.dataset.path = item.path;
+                lEl.innerHTML = `
+      <span class="list-icon"><i class="${iconClass}" style="color:${iconColor}"></i></span>
+      <span class="list-name">${item.name}</span>
+      <span class="list-meta">${item.is_dir ? 'DIR' : (formatSize(item.size) || '')}</span>
+    `;
+                lEl.addEventListener('click', e => handleFileClick(e, item, lEl));
+                lEl.addEventListener('dblclick', () => handleFileOpen(item));
+                lEl.addEventListener('contextmenu', e => showCtxMenu(e, item));
+                list.appendChild(lEl);
+            });
+
+            fbContent.appendChild(grid);
+            fbContent.appendChild(list);
+        }
+
+        function handleFileClick(e, item, el) {
+            document.querySelectorAll('.file-item.selected, .list-item.selected').forEach(x => x.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedItem = item;
+            document.getElementById('btn-delete').disabled = false;
+        }
+
+        function handleFileOpen(item) {
+            if (item.is_dir) {
+                historyStack.push(currentPath);
+                loadDir(item.path);
+            } else {
+                openEditor(item);
+            }
+        }
+
+        async function openEditor(item) {
+            if (item.is_dir) return;
+            editingPath = item.path;
+            document.getElementById('editor-filename').textContent = item.name;
+            document.getElementById('editor-textarea').value = '';
+            document.getElementById('editor-modal').classList.add('open');
+            setStatus('', `Reading ${item.name}…`);
+            try {
+                const text = await fsRead(item.path);
+                document.getElementById('editor-textarea').value = text;
+                setStatus('', `Editing: ${item.name}`);
+            } catch (e) {
+                document.getElementById('editor-textarea').value = `[Error reading file: ${e.message}]`;
+                setStatus('', `Error reading file`);
+            }
+        }
+
+        async function saveEditor() {
+            if (!editingPath) return;
+            const content = document.getElementById('editor-textarea').value;
+            try {
+                await fsWrite(editingPath, content);
+                document.getElementById('editor-modal').classList.remove('open');
+                setStatus('', `Saved ${editingPath.split('/').pop()}`);
+                loadDir(currentPath);
+            } catch (e) {
+                setStatus('', `Error saving: ${e.message}`);
+            }
+        }
+
+        document.getElementById('editor-close').onclick = () => document.getElementById('editor-modal').classList.remove('open');
+        document.getElementById('btn-cancel-edit').onclick = () => document.getElementById('editor-modal').classList.remove('open');
+        document.getElementById('btn-save-edit').onclick = saveEditor;
+
+        function openRename(item) {
+            renamingItem = item;
+            document.getElementById('rename-input').value = item.name;
+            document.getElementById('rename-modal').classList.add('open');
+            setTimeout(() => document.getElementById('rename-input').focus(), 50);
+        }
+
+        async function confirmRename() {
+            if (!renamingItem) return;
+            const newName = document.getElementById('rename-input').value.trim();
+            if (!newName || newName === renamingItem.name) {
+                document.getElementById('rename-modal').classList.remove('open');
+                return;
+            }
+            try {
+                await fsRename(renamingItem.path, newName);
+                document.getElementById('rename-modal').classList.remove('open');
+                setStatus('', `Renamed to ${newName}`);
+                loadDir(currentPath);
+            } catch (e) {
+                setStatus('', `Rename error: ${e.message}`);
+            }
+        }
+
+        document.getElementById('btn-cancel-rename').onclick = () => document.getElementById('rename-modal').classList.remove('open');
+        document.getElementById('btn-confirm-rename').onclick = confirmRename;
+        document.getElementById('rename-input').addEventListener('keydown', e => { if (e.key === 'Enter') confirmRename(); });
+
+        function openMove(item) {
+            movingItem = item;
+            const parentPath = item.path.split('/').slice(0, -1).join('/');
+            document.getElementById('move-input').value = parentPath;
+            document.getElementById('move-modal').classList.add('open');
+            setTimeout(() => document.getElementById('move-input').focus(), 50);
+        }
+
+        async function confirmMove() {
+            if (!movingItem) return;
+            const dest = document.getElementById('move-input').value.trim();
+            if (!dest) return;
+            try {
+                await fsMove(movingItem.path, dest);
+                document.getElementById('move-modal').classList.remove('open');
+                setStatus('', `Moved ${movingItem.name} to ${dest}`);
+                loadDir(currentPath);
+            } catch (e) {
+                setStatus('', `Move error: ${e.message}`);
+            }
+        }
+
+        document.getElementById('btn-cancel-move').onclick = () => document.getElementById('move-modal').classList.remove('open');
+        document.getElementById('btn-confirm-move').onclick = confirmMove;
+        document.getElementById('move-input').addEventListener('keydown', e => { if (e.key === 'Enter') confirmMove(); });
+
+        function showCtxMenu(e, item) {
+            e.preventDefault();
+            selectedItem = item;
+            document.querySelectorAll('.file-item.selected, .list-item.selected').forEach(x => x.classList.remove('selected'));
+            const el = e.currentTarget;
+            el.classList.add('selected');
+            document.getElementById('btn-delete').disabled = false;
+
+            // Show/hide context-sensitive items
+            ctxMenu.querySelectorAll('.file-only').forEach(el => el.style.display = item.is_dir ? 'none' : 'flex');
+            ctxMenu.querySelectorAll('.dir-only').forEach(el => el.style.display = item.is_dir ? 'flex' : 'none');
+
+            // Hide "Edit" for directories
+            const editItem = ctxMenu.querySelector('[data-action="edit"]');
+            editItem.style.display = item.is_dir ? 'none' : 'flex';
+
+            ctxMenu.style.left = Math.min(e.clientX, window.innerWidth - 190) + 'px';
+            ctxMenu.style.top = Math.min(e.clientY, window.innerHeight - 220) + 'px';
+            ctxMenu.style.display = 'block';
+        }
+
+        document.addEventListener('click', () => ctxMenu.style.display = 'none');
+        document.addEventListener('contextmenu', e => { if (!e.target.closest('.file-item, .list-item')) ctxMenu.style.display = 'none'; });
+
+        ctxMenu.querySelectorAll('.ctx-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const action = item.dataset.action;
+                if (!selectedItem) return;
+                if (action === 'open') handleFileOpen(selectedItem);
+                if (action === 'edit') openEditor(selectedItem);
+                if (action === 'rename') openRename(selectedItem);
+                if (action === 'move') openMove(selectedItem);
+                if (action === 'delete') deleteItem(selectedItem);
+                if (action === 'download-file') downloadFile(selectedItem);
+                if (action === 'download-folder') downloadFolder(selectedItem);
+                ctxMenu.style.display = 'none';
+            });
+        });
+
+        async function deleteItem(item) {
+            if (!confirm(`Delete "${item.name}"? This cannot be undone.`)) return;
+            try {
+                await fsDelete(item.path);
+                setStatus('', `Deleted ${item.name}`);
+                selectedItem = null;
+                document.getElementById('btn-delete').disabled = true;
+                loadDir(currentPath);
+            } catch (e) {
+                setStatus('', `Delete error: ${e.message}`);
+            }
+        }
+
+        document.getElementById('btn-back').onclick = () => {
+            if (historyStack.length > 0) loadDir(historyStack.pop());
+        };
+        document.getElementById('btn-home').onclick = () => { historyStack.push(currentPath); loadDir('/'); };
+        document.getElementById('btn-refresh').onclick = () => loadDir(currentPath);
+        document.getElementById('btn-delete').onclick = () => { if (selectedItem) deleteItem(selectedItem); };
+
+        document.getElementById('btn-grid').onclick = () => { viewMode = 'grid'; renderFiles(); };
+        document.getElementById('btn-list').onclick = () => { viewMode = 'list'; renderFiles(); };
+        document.getElementById('sort-select').onchange = (e) => { sortMode = e.target.value; renderFiles(); };
+
+        async function fsCopy(srcPath, destDir) {
+            srcPath = normPath(srcPath);
+            destDir = normPath(destDir);
+            const node = await idbGet(srcPath);
+            if (!node) throw new Error(`Not found: ${srcPath}`);
+            const newPath = normPath(destDir + '/' + node.name);
+            await fsMkdir(destDir);
+            if (node.is_dir) {
+                await fsMkdir(newPath);
+                const children = await idbGetByParent(srcPath);
+                for (const child of children) await fsCopy(child.path, newPath);
+            } else {
+                await idbPut({ ...node, path: newPath, parent: destDir, created: Date.now(), modified: Date.now() });
+            }
+        }
+
+        async function fsSearch(query, startPath) {
+            startPath = normPath(startPath || '/');
+            const all = await idbGetAll();
+            const q = query.toLowerCase();
+            return all.filter(n => n.path !== '/' && n.name.toLowerCase().includes(q) && n.path.startsWith(startPath))
+                .map(n => ({ name: n.name, path: n.path, is_dir: n.is_dir, size: n.size, modified: n.modified }));
+        }
+
+        async function fsDiskUsage(path) {
+            path = normPath(path);
+            const all = await idbGetAll();
+            let total = 0;
+            for (const n of all) {
+                if (!n.is_dir && n.path.startsWith(path)) total += n.size || 0;
+            }
+            return total;
+        }
+
+        document.getElementById('btn-new-folder').onclick = async () => {
+            const name = prompt('Folder name:');
+            if (!name) return;
+            const fullPath = currentPath === '/' ? '/' + name : currentPath + '/' + name;
+            try {
+                await fsMkdir(fullPath);
+                setStatus('', `Created folder: ${name}`);
+                loadDir(currentPath);
+            } catch (e) {
+                setStatus('', `Error: ${e.message}`);
+            }
+        };
+
+        document.getElementById('btn-upload').onclick = () => document.getElementById('upload-input').click();
+        document.getElementById('upload-input').onchange = async (e) => {
+            const uploadedFiles = Array.from(e.target.files);
+            if (!uploadedFiles.length) return;
+            setStatus('', `Importing ${uploadedFiles.length} file(s)…`);
+            for (const f of uploadedFiles) {
+                const dest = currentPath + '/' + f.name;
+                await fsWrite(dest, f);
+            }
+            e.target.value = '';
+            setStatus(`${uploadedFiles.length} imported`, '');
+            loadDir(currentPath);
+        };
+
+        document.getElementById('btn-upload-folder').onclick = () => document.getElementById('upload-folder-input').click();
+        document.getElementById('upload-folder-input').onchange = async (e) => {
+            const uploadedFiles = Array.from(e.target.files);
+            if (!uploadedFiles.length) return;
+            const topFolder = uploadedFiles[0].webkitRelativePath.split('/')[0];
+            const baseDest = currentPath + '/' + topFolder;
+            setStatus('', `Importing folder "${topFolder}"…`);
+            try {
+                await fsMkdir(baseDest);
+                for (const f of uploadedFiles) {
+                    const relParts = f.webkitRelativePath.split('/').slice(1);
+                    let destPath = baseDest;
+                    for (let i = 0; i < relParts.length - 1; i++) {
+                        destPath += '/' + relParts[i];
+                        await fsMkdir(destPath);
+                    }
+                    destPath += '/' + relParts[relParts.length - 1];
+                    await fsWrite(destPath, f);
+                }
+                e.target.value = '';
+                setStatus('', `Imported folder: ${topFolder}`);
+                loadDir(currentPath);
+            } catch (err) {
+                setStatus('', `Folder import error: ${err.message}`);
+            }
+        };
+
+        function setStatus(count, msg) {
+            if (count !== undefined) statusCount.textContent = count || '—';
+            if (msg !== undefined) statusMsg.textContent = msg;
+        }
+
+        // ── Clear chat ────────────────────────────────────────────────────────────
+
+        const WELCOME_MSG = `<div class="msg ai">
+            <span class="msg-role">CLIO</span>
+            <div class="msg-body">Ready. Files are stored locally in your browser. I can list, open, edit,
+                rename, move, copy, search, and delete files — ask me anything.</div>
+        </div>`;
+
+        document.getElementById('btn-clear-chat').onclick = () => {
+            conversationHistory = [];
+            chatMessages.innerHTML = WELCOME_MSG;
+            setStatus(undefined, 'Chat cleared');
+        };
+
+        // ─────────────────────────────────────────────────────────────────────────
+
+        const AI_TOOLS = [
+            {
+                type: 'function',
+                function: {
+                    name: 'list_directory',
+                    description: 'List files and directories at a path. Paths start from /.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string', description: 'Directory path to list, e.g. / or /Documents' }
+                        },
+                        required: ['path']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'read_file',
+                    description: 'Read the text content of a file.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string', description: 'Full path to the file' }
+                        },
+                        required: ['path']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'write_file',
+                    description: 'Create or overwrite a file with given text content.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string', description: 'Full path to the file' },
+                            content: { type: 'string', description: 'Text content to write' }
+                        },
+                        required: ['path', 'content']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'rename_file',
+                    description: 'Rename a file or directory. new_name is just the name, not a full path.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string', description: 'Full path to the file or directory' },
+                            new_name: { type: 'string', description: 'New name only, e.g. "photo_1.jpg"' }
+                        },
+                        required: ['path', 'new_name']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'move_file',
+                    description: 'Move a file or directory into a destination folder.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            source: { type: 'string', description: 'Full path of the source' },
+                            destination: { type: 'string', description: 'Full path of the destination folder' }
+                        },
+                        required: ['source', 'destination']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'copy_file',
+                    description: 'Copy a file or directory into a destination folder.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            source: { type: 'string', description: 'Full path of the source file or directory' },
+                            destination: { type: 'string', description: 'Full path of destination folder' }
+                        },
+                        required: ['source', 'destination']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'delete_file',
+                    description: 'Delete a file or directory (recursive).',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string', description: 'Full path to delete' }
+                        },
+                        required: ['path']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'create_directory',
+                    description: 'Create a new directory (and any missing parents).',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string', description: 'Full path of the directory to create' }
+                        },
+                        required: ['path']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'navigate_to',
+                    description: 'Navigate the file browser UI to a directory.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string', description: 'Directory path to navigate to' }
+                        },
+                        required: ['path']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'search_files',
+                    description: 'Search for files or folders by name substring across the filesystem.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            query: { type: 'string', description: 'Name substring to search for' },
+                            start_path: { type: 'string', description: 'Where to start searching, default /' }
+                        },
+                        required: ['query']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'get_disk_usage',
+                    description: 'Get total bytes used under a directory path.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            path: { type: 'string', description: 'Directory to measure, default /' }
+                        },
+                        required: ['path']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'show_embed',
+                    description: 'Show the user a rich interactive HTML embed card inline in the chat. Use this to visualize data, show charts, render file trees, display storage breakdowns, show image galleries, format file lists as tables, create mini dashboards, or explain things visually. The html parameter is a complete self-contained HTML document string.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: 'Short label shown in the embed header, e.g. "Storage Breakdown" or "File Tree"' },
+                            html: { type: 'string', description: 'Complete self-contained HTML document. Must work with no external dependencies except inline CSS/JS. Use a dark bg (#1a1410), orange (#e8720c) accents, Chakra Petch or monospace fonts via Google Fonts if needed. Make it beautiful and useful.' }
+                        },
+                        required: ['title', 'html']
+                    }
+                }
+            }
+        ];
+
+        async function executeTool(name, args) {
+            switch (name) {
+                case 'list_directory': {
+                    const items = await fsReaddir(args.path);
+                    return JSON.stringify(items.map(i => ({
+                        name: i.name,
+                        path: i.path,
+                        is_dir: i.is_dir,
+                        size: i.size
+                    })));
+                }
+                case 'read_file': {
+                    const text = await fsRead(args.path);
+                    return text.slice(0, 4000);
+                }
+                case 'write_file': {
+                    await fsWrite(args.path, args.content);
+                    loadDir(currentPath);
+                    return 'File written successfully.';
+                }
+                case 'rename_file': {
+                    await fsRename(args.path, args.new_name);
+                    loadDir(currentPath);
+                    return `Renamed to ${args.new_name}`;
+                }
+                case 'move_file': {
+                    await fsMove(args.source, args.destination);
+                    loadDir(currentPath);
+                    return `Moved to ${args.destination}`;
+                }
+                case 'delete_file': {
+                    await fsDelete(args.path);
+                    loadDir(currentPath);
+                    return `Deleted ${args.path}`;
+                }
+                case 'create_directory': {
+                    await fsMkdir(args.path);
+                    loadDir(currentPath);
+                    return `Directory created: ${args.path}`;
+                }
+                case 'copy_file': {
+                    await fsCopy(args.source, args.destination);
+                    loadDir(currentPath);
+                    return `Copied to ${args.destination}`;
+                }
+                case 'search_files': {
+                    const results = await fsSearch(args.query, args.start_path || '/');
+                    if (!results.length) return 'No files found matching: ' + args.query;
+                    return JSON.stringify(results.slice(0, 50));
+                }
+                case 'get_disk_usage': {
+                    const bytes = await fsDiskUsage(args.path || '/');
+                    const mb = (bytes / 1048576).toFixed(2);
+                    return `${mb} MB (${bytes.toLocaleString()} bytes)`;
+                }
+                case 'get_current_path': {
+                    return currentPath;
+                }
+                case 'navigate_to': {
+                    historyStack.push(currentPath);
+                    await loadDir(args.path);
+                    return `Navigated to ${args.path}`;
+                }
+                case 'show_embed': {
+                    addEmbedCard(args.title, args.html);
+                    return `Embed rendered: ${args.title}`;
+                }
+                default:
+                    return 'Unknown tool.';
+            }
+        }
+
+        function addChatMsg(role, text) {
+            const div = document.createElement('div');
+            div.className = `msg ${role === 'user' ? 'user' : 'ai'}`;
+            div.innerHTML = `<span class="msg-role">${role === 'user' ? 'YOU' : 'CLIO'}</span><div class="msg-body">${text.replace(/\n/g, '<br>')}</div>`;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return div;
+        }
+
+        function addToolCall(name, args) {
+            const div = document.createElement('div');
+            div.className = 'tool-call';
+            const argStr = JSON.stringify(args, null, 0).slice(0, 120);
+            div.innerHTML = `<div class="tc-name"><i class="fa-solid fa-gear"></i> ${name}</div><div class="tc-args">${argStr}</div>`;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return div;
+        }
+
+        function addEmbedCard(title, html) {
+            const card = document.createElement('div');
+            card.className = 'chat-embed';
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            card.innerHTML = `
+    <div class="chat-embed-header">
+      <i class="fa-solid fa-display chat-embed-icon"></i>
+      <span class="chat-embed-label">${title.toUpperCase()}</span>
+      <i class="fa-solid fa-up-right-and-down-left-from-center chat-embed-expand"></i>
+    </div>
+    <iframe src="${url}" sandbox="allow-scripts" scrolling="auto"></iframe>
+  `;
+            card.querySelector('.chat-embed-header').addEventListener('click', () => {
+                document.getElementById('embed-title-text').textContent = title.toUpperCase();
+                document.getElementById('embed-frame').src = url;
+                document.getElementById('embed-modal').classList.add('open');
+            });
+            chatMessages.appendChild(card);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        document.getElementById('embed-close').onclick = () => {
+            document.getElementById('embed-modal').classList.remove('open');
+        };
+
+        async function runAI(userText) {
+            if (isAIBusy) return;
+            isAIBusy = true;
+            aiAbortFlag = false;
+            sendBtn.disabled = true;
+            aiDot.classList.add('thinking');
+            document.getElementById('ai-thinking').classList.add('visible');
+
+            const sysPrompt = `You are CLIO, an AI file manager agent. Your name is an acronym and also the Greek muse of history and record-keeping. The filesystem is stored locally in the browser (IndexedDB). Paths start from /. The user's current directory is: ${currentPath}.
+You have tools to list, read, write, rename, copy, move, delete files, search, navigate, and check disk usage.
+You CAN call multiple tools in a single response when performing batch operations (e.g. renaming many files). Always list the directory first if you don't know its contents. Be concise in text responses.`;
+
+            conversationHistory.push({ role: 'user', content: userText });
+
+            const messages = [
+                { role: 'system', content: sysPrompt },
+                ...conversationHistory
+            ];
+
+            let continueLoop = true;
+            let finalText = '';
+            let safetyLimit = 40;
+
+            while (continueLoop && safetyLimit-- > 0 && !aiAbortFlag) {
+
+                const stepsDone = 40 - safetyLimit;
+                if (stepsDone > 1) document.getElementById('think-label').innerHTML = `Working (${stepsDone} steps)<span id="think-dots"></span>`;
+
+                let resp;
+                try {
+                    resp = await puter.ai.chat(messages, { model: 'gpt-4o-mini', tools: AI_TOOLS });
+                } catch (e) {
+                    finalText = `AI error: ${e.message}`;
+                    break;
+                }
+
+                if (aiAbortFlag) { finalText = 'Stopped.'; break; }
+
+                let textContent = '';
+                let toolCalls = [];
+
+                if (resp && resp.message) {
+                    const msg = resp.message;
+                    if (msg.content && typeof msg.content === 'string') textContent = msg.content;
+                    if (msg.tool_calls && Array.isArray(msg.tool_calls)) toolCalls = msg.tool_calls;
+                    messages.push(msg);
+                    conversationHistory.push(msg);
+                }
+
+                if (toolCalls.length > 0) {
+                    const toolResults = [];
+
+                    for (const tc of toolCalls) {
+                        if (aiAbortFlag) break;
+                        let args = {};
+                        try { args = JSON.parse(tc.function.arguments); } catch (e) { }
+
+                        const tcEl = addToolCall(tc.function.name, args);
+                        let toolResult = '';
+
+                        try {
+                            toolResult = await executeTool(tc.function.name, args);
+                            tcEl.classList.add('success');
+                            tcEl.querySelector('.tc-name').innerHTML = `<i class="fa-solid fa-check"></i> ${tc.function.name}`;
+                            const rd = document.createElement('div');
+                            rd.style.cssText = 'color:var(--green);margin-top:3px;font-size:9px';
+                            rd.textContent = toolResult.slice(0, 120);
+                            tcEl.appendChild(rd);
+                        } catch (e) {
+                            toolResult = `Error: ${e.message}`;
+                            tcEl.classList.add('error');
+                            const rd = document.createElement('div');
+                            rd.style.cssText = 'color:var(--red);margin-top:3px;font-size:9px';
+                            rd.textContent = toolResult;
+                            tcEl.appendChild(rd);
+                        }
+
+                        toolResults.push({ role: 'tool', tool_call_id: tc.id, content: toolResult });
+                    }
+
+                    for (const tr of toolResults) {
+                        messages.push(tr);
+                        conversationHistory.push(tr);
+                    }
+
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                } else {
+                    if (!textContent) {
+                        try {
+                            if (resp && resp.choices && resp.choices[0]) {
+                                textContent = resp.choices[0].message?.content || '';
+                            } else if (resp && typeof resp === 'string') {
+                                textContent = resp;
+                            } else if (resp && resp.message && resp.message.content) {
+                                textContent = resp.message.content;
+                            } else {
+                                const j = JSON.stringify(resp);
+                                textContent = j && j !== '{}' ? j.slice(0, 300) : 'Done.';
+                            }
+                        } catch (e) {
+                            textContent = 'Done.';
+                        }
+                    }
+
+                    finalText = textContent || 'Done.';
+                    conversationHistory.push({ role: 'assistant', content: finalText });
+                    continueLoop = false;
+                }
+            }
+
+            if (safetyLimit <= 0) finalText = (finalText || '') + '\n[Safety limit reached]';
+            if (aiAbortFlag && !finalText) finalText = 'Stopped.';
+            if (finalText) addChatMsg('ai', finalText);
+
+            isAIBusy = false;
+            aiAbortFlag = false;
+            sendBtn.disabled = false;
+            aiDot.classList.remove('thinking');
+            document.getElementById('ai-thinking').classList.remove('visible');
+            document.getElementById('think-label').innerHTML = `Thinking<span id="think-dots"></span>`;
+        }
+
+        function sendMessage() {
+            const text = chatInput.value.trim();
+            if (!text || isAIBusy) return;
+            addChatMsg('user', text);
+            chatInput.value = '';
+            runAI(text);
+        }
+
+        sendBtn.onclick = sendMessage;
+        chatInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+        document.getElementById('think-stop').onclick = () => { aiAbortFlag = true; };
+
+        async function init() {
+            db = await idbOpen();
+            await fsEnsureRoot();
+            statusUser.textContent = 'local storage';
+            loadDir('/');
+        }
+
+        init();
+    </script>
+
+    <footer style="display:none">
+        <a href="https://developer.puter.com">Powered by Puter</a>
+    </footer>
+</body>
+
+</html>
