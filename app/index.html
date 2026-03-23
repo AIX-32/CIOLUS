@@ -285,13 +285,11 @@
             position: absolute;
             border: 2px solid var(--orange);
             background: rgba(232, 114, 12, 0.12);
-            background-image: repeating-linear-gradient(
-                45deg,
-                rgba(232, 114, 12, 0.16) 0px,
-                rgba(232, 114, 12, 0.16) 10px,
-                rgba(232, 114, 12, 0.06) 10px,
-                rgba(232, 114, 12, 0.06) 20px
-            );
+            background-image: repeating-linear-gradient(45deg,
+                    rgba(232, 114, 12, 0.16) 0px,
+                    rgba(232, 114, 12, 0.16) 10px,
+                    rgba(232, 114, 12, 0.06) 10px,
+                    rgba(232, 114, 12, 0.06) 20px);
             box-shadow:
                 0 0 0 1px rgba(232, 114, 12, 0.22) inset,
                 0 10px 26px rgba(232, 114, 12, 0.10);
@@ -611,8 +609,13 @@
         }
 
         /* ctx-item for dir-only: hidden by default, shown via JS */
-        .ctx-item.dir-only { display: none; }
-        .ctx-item.file-only { display: none; }
+        .ctx-item.dir-only {
+            display: none;
+        }
+
+        .ctx-item.file-only {
+            display: none;
+        }
 
 
         #statusbar {
@@ -1254,9 +1257,9 @@
         <span class="logo">CIOLUS<span> / FILES</span></span>
         <div id="topbar-path">~/</div>
         <div class="topbar-actions">
-            <button class="topbar-btn" id="btn-new-folder"><i class="fa fa-folder-plus"></i> NEW FOLDER</button>
-            <button class="topbar-btn primary" id="btn-upload"><i class="fa fa-file-arrow-up"></i> UPLOAD FILES</button>
-            <button class="topbar-btn primary" id="btn-upload-folder"><i class="fa fa-folder-arrow-up"></i> UPLOAD
+            <button class="topbar-btn" id="btn-new-folder">NEW FOLDER</button>
+            <button class="topbar-btn primary" id="btn-upload">UPLOAD FILES</button>
+            <button class="topbar-btn primary" id="btn-upload-folder"> UPLOAD
                 FOLDER</button>
             <input type="file" id="upload-input" multiple style="display:none">
             <input type="file" id="upload-folder-input" webkitdirectory multiple style="display:none">
@@ -1268,8 +1271,8 @@
         <div id="filebrowser">
             <div id="fb-toolbar">
                 <button class="fb-btn" id="btn-back"><i class="fa-solid fa-arrow-left"></i> BACK</button>
-                <button class="fb-btn" id="btn-home"><i class="fa-solid fa-house"></i> HOME</button>
-                <button class="fb-btn" id="btn-refresh"><i class="fa-solid fa-rotate-right"></i> REFRESH</button>
+                <button class="fb-btn" id="btn-home"> HOME</button>
+                <button class="fb-btn" id="btn-refresh"> EFRESH</button>
                 <button class="fb-btn danger" id="btn-delete" disabled><i class="fa-solid fa-trash"></i> DELETE</button>
                 <span id="selection-count">0 selected</span>
                 <select id="sort-select" title="Sort order">
@@ -1333,8 +1336,10 @@
         <div class="ctx-item" data-action="rename"><i class="fa-solid fa-i-cursor fa-fw"></i> Rename</div>
         <div class="ctx-item" data-action="move"><i class="fa-solid fa-file-export fa-fw"></i> Move to…</div>
         <div class="ctx-sep"></div>
-        <div class="ctx-item file-only" data-action="download-file"><i class="fa-solid fa-download fa-fw"></i> Download</div>
-        <div class="ctx-item dir-only" data-action="download-folder"><i class="fa-solid fa-file-zipper fa-fw"></i> Download as ZIP</div>
+        <div class="ctx-item file-only" data-action="download-file"><i class="fa-solid fa-download fa-fw"></i> Download
+        </div>
+        <div class="ctx-item dir-only" data-action="download-folder"><i class="fa-solid fa-file-zipper fa-fw"></i>
+            Download as ZIP</div>
         <div class="ctx-sep"></div>
         <div class="ctx-item danger" data-action="delete"><i class="fa-solid fa-trash fa-fw"></i> Delete</div>
     </div>
@@ -1424,6 +1429,17 @@
                 const r = idbTx('readwrite').put(node);
                 r.onsuccess = () => res();
                 r.onerror = e => rej(e.target.error);
+            });
+        }
+
+        function idbPutMany(nodes) {
+            return new Promise((res, rej) => {
+                const tx = db.transaction('nodes', 'readwrite');
+                const store = tx.objectStore('nodes');
+                tx.oncomplete = () => res();
+                tx.onabort = () => rej(tx.error || new Error('IndexedDB transaction aborted'));
+                tx.onerror = () => rej(tx.error || new Error('IndexedDB transaction failed'));
+                for (const node of nodes) store.put(node);
             });
         }
 
@@ -1530,16 +1546,21 @@
                 else await fsMkdir(parent);
             }
             let buf;
+            let size = 0;
             if (typeof content === 'string') {
                 buf = new TextEncoder().encode(content).buffer;
+                size = buf.byteLength;
             } else if (content instanceof ArrayBuffer) {
                 buf = content;
+                size = buf.byteLength;
             } else if (content instanceof Blob || content instanceof File) {
-                buf = await content.arrayBuffer();
+                // Store Blob/File directly to avoid expensive reads during large imports.
+                buf = content;
+                size = content.size || 0;
             } else {
                 buf = content;
+                size = buf && buf.byteLength ? buf.byteLength : 0;
             }
-            const size = buf ? buf.byteLength : 0;
             const existing = await idbGet(path);
             await idbPut({ path, name: nameOf(path), is_dir: false, parent, content: buf, size, created: existing ? existing.created : Date.now(), modified: Date.now() });
         }
@@ -1548,14 +1569,18 @@
             path = normPath(path);
             const node = await idbGet(path);
             if (!node) throw new Error(`Not found: ${path}`);
-            return node.content ? new TextDecoder().decode(node.content) : '';
+            if (!node.content) return '';
+            if (node.content instanceof Blob) return await node.content.text();
+            return new TextDecoder().decode(node.content);
         }
 
         async function fsReadBinary(path) {
             path = normPath(path);
             const node = await idbGet(path);
             if (!node) throw new Error(`Not found: ${path}`);
-            return node.content || new ArrayBuffer(0);
+            if (!node.content) return new ArrayBuffer(0);
+            if (node.content instanceof Blob) return await node.content.arrayBuffer();
+            return node.content;
         }
 
         async function fsRename(path, newName) {
@@ -1697,7 +1722,11 @@
 
             for (const { node, relPath } of entries) {
                 const nameBuf = enc.encode(relPath);
-                const dataBuf = node.content ? new Uint8Array(node.content) : new Uint8Array(0);
+                let dataBuf = new Uint8Array(0);
+                if (node.content) {
+                    const ab = node.content instanceof Blob ? await node.content.arrayBuffer() : node.content;
+                    dataBuf = ab ? new Uint8Array(ab) : new Uint8Array(0);
+                }
                 const crc = crc32(dataBuf);
                 const size = dataBuf.byteLength;
 
@@ -1839,6 +1868,10 @@
         let conversationHistory = [];
         let isAIBusy = false;
         let aiAbortFlag = false;
+        const undoStack = [];
+        const UNDO_LIMIT = 50;
+        const UNDO_MAX_NODES = 5000;
+        let isUndoing = false;
 
         const fbContent = document.getElementById('fb-content');
         const pathDisplay = document.getElementById('topbar-path');
@@ -1856,6 +1889,145 @@
         const selectionBox = document.createElement('div');
         selectionBox.id = 'selection-box';
         fbContent.appendChild(selectionBox);
+
+        function pushUndo(action) {
+            if (isUndoing) return;
+            if (!action || !action.type) return;
+            undoStack.push({ ...action, at: Date.now() });
+            if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+        }
+
+        function isAnyModalOpen() {
+            return !!(
+                document.getElementById('editor-modal')?.classList.contains('open') ||
+                document.getElementById('rename-modal')?.classList.contains('open') ||
+                document.getElementById('move-modal')?.classList.contains('open') ||
+                document.getElementById('embed-modal')?.classList.contains('open')
+            );
+        }
+
+        function isTypingTarget(el) {
+            if (!el) return false;
+            const tag = (el.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+            if (el.isContentEditable) return true;
+            return false;
+        }
+
+        async function collectSubtreeNodes(path, outMap) {
+            path = normPath(path);
+            if (outMap.has(path)) return;
+            const node = await idbGet(path);
+            if (!node) return;
+            outMap.set(path, node);
+            if (!node.is_dir) return;
+            const children = await idbGetByParent(path);
+            for (const c of children) await collectSubtreeNodes(c.path, outMap);
+        }
+
+        async function snapshotNodesForPaths(paths) {
+            const outMap = new Map();
+            for (const p of paths) {
+                await collectSubtreeNodes(p, outMap);
+                if (outMap.size > UNDO_MAX_NODES) return null;
+            }
+            const nodes = Array.from(outMap.values());
+            nodes.sort((a, b) => a.path.split('/').length - b.path.split('/').length);
+            return nodes;
+        }
+
+        async function restoreNodes(nodes) {
+            if (!nodes || !nodes.length) return;
+            await fsEnsureRoot();
+            const sorted = [...nodes].sort((a, b) => a.path.split('/').length - b.path.split('/').length);
+            await idbPutManyChunked(sorted);
+        }
+
+        async function fsWriteWithUndo(path, content, opts = {}) {
+            const p = normPath(path);
+            const before = await idbGet(p);
+            await fsWrite(p, content, opts);
+            pushUndo({ type: 'write', path: p, before });
+        }
+
+        async function fsRenameWithUndo(path, newName) {
+            const p = normPath(path);
+            const oldName = nameOf(p);
+            const parent = parentOf(p);
+            const to = normPath(parent + '/' + newName);
+            await fsRename(p, newName);
+            pushUndo({ type: 'rename', from: p, to, oldName });
+        }
+
+        async function fsMoveWithUndo(srcPath, destPath, opts = {}) {
+            const src = normPath(srcPath);
+            const node = await idbGet(src);
+            if (!node) throw new Error(`Not found: ${src}`);
+            const fromParent = node.parent || parentOf(src);
+            const dest = normPath(destPath);
+            const to = normPath(dest + '/' + node.name);
+            await fsMove(src, dest, opts);
+            pushUndo({ type: 'move', from: src, to, fromParent });
+        }
+
+        async function fsMkdirWithUndo(path, opts = {}) {
+            const p = normPath(path);
+            const existing = await idbGet(p);
+            if (existing) {
+                if (!existing.is_dir) throw new Error(`Not a directory: ${p}`);
+                return existing;
+            }
+            const created = await fsMkdir(p, opts);
+            pushUndo({ type: 'mkdir', path: p });
+            return created;
+        }
+
+        async function undoLastAction() {
+            const action = undoStack.pop();
+            if (!action) { setStatus('', 'Nothing to undo'); return; }
+
+            isUndoing = true;
+            try {
+                if (action.type === 'delete') {
+                    await restoreNodes(action.nodes);
+                    setStatus('', `Undo: restored ${action.nodes?.length || 0} node(s)`);
+                } else if (action.type === 'move') {
+                    await fsMkdir(action.fromParent);
+                    await fsMove(action.to, action.fromParent);
+                    setStatus('', `Undo: moved back`);
+                } else if (action.type === 'moves') {
+                    const moves = Array.isArray(action.moves) ? action.moves : [];
+                    for (let i = moves.length - 1; i >= 0; i--) {
+                        const m = moves[i];
+                        if (!m?.to || !m?.fromParent) continue;
+                        await fsMkdir(m.fromParent);
+                        await fsMove(m.to, m.fromParent);
+                    }
+                    setStatus('', `Undo: reverted ${moves.length} move(s)`);
+                } else if (action.type === 'rename') {
+                    await fsRename(action.to, action.oldName);
+                    setStatus('', `Undo: renamed back`);
+                } else if (action.type === 'write') {
+                    if (!action.before) {
+                        await fsDelete(action.path);
+                        setStatus('', `Undo: removed ${nameOf(action.path)}`);
+                    } else {
+                        await idbPut(action.before);
+                        setStatus('', `Undo: restored ${nameOf(action.path)}`);
+                    }
+                } else if (action.type === 'mkdir') {
+                    await fsDelete(action.path);
+                    setStatus('', `Undo: removed folder ${nameOf(action.path)}`);
+                } else {
+                    setStatus('', 'Nothing to undo');
+                }
+                loadDir(currentPath);
+            } catch (e) {
+                setStatus('', `Undo error: ${e.message}`);
+            } finally {
+                isUndoing = false;
+            }
+        }
 
         function getVisibleItemElements() {
             const container = fbContent.classList.contains('view-list')
@@ -1886,6 +2058,13 @@
         function clearSelection() {
             selectedPaths.clear();
             selectedItem = null;
+            syncSelectionUI();
+        }
+
+        function selectAllInCurrentDir() {
+            selectedPaths.clear();
+            for (const f of files) selectedPaths.add(f.path);
+            updateSelectedItemFromSelection();
             syncSelectionUI();
         }
 
@@ -2216,7 +2395,7 @@
             if (!editingPath) return;
             const content = document.getElementById('editor-textarea').value;
             try {
-                await fsWrite(editingPath, content);
+                await fsWriteWithUndo(editingPath, content);
                 document.getElementById('editor-modal').classList.remove('open');
                 setStatus('', `Saved ${editingPath.split('/').pop()}`);
                 loadDir(currentPath);
@@ -2244,7 +2423,7 @@
                 return;
             }
             try {
-                await fsRename(renamingItem.path, newName);
+                await fsRenameWithUndo(renamingItem.path, newName);
                 document.getElementById('rename-modal').classList.remove('open');
                 setStatus('', `Renamed to ${newName}`);
                 loadDir(currentPath);
@@ -2270,7 +2449,7 @@
             const dest = document.getElementById('move-input').value.trim();
             if (!dest) return;
             try {
-                await fsMove(movingItem.path, dest);
+                await fsMoveWithUndo(movingItem.path, dest);
                 document.getElementById('move-modal').classList.remove('open');
                 setStatus('', `Moved ${movingItem.name} to ${dest}`);
                 loadDir(currentPath);
@@ -2339,8 +2518,8 @@
             if (!paths.length) return;
 
             const label = paths.length === 1
-                ? `Delete "${(selectedItem && selectedItem.name) ? selectedItem.name : paths[0].split('/').pop()}"? This cannot be undone.`
-                : `Delete ${paths.length} items? This cannot be undone.`;
+                ? `Delete "${(selectedItem && selectedItem.name) ? selectedItem.name : paths[0].split('/').pop()}"? You can undo with Ctrl+Z.`
+                : `Delete ${paths.length} items? You can undo with Ctrl+Z.`;
 
             try {
                 const ok = (typeof window !== 'undefined' && typeof window.confirm === 'function')
@@ -2353,7 +2532,10 @@
             }
 
             try {
+                setStatus('', 'Preparing undo…');
+                const undoNodes = await snapshotNodesForPaths(paths);
                 for (const p of paths) await fsDelete(p);
+                if (undoNodes) pushUndo({ type: 'delete', nodes: undoNodes });
                 setStatus('', paths.length === 1 ? 'Deleted 1 item' : `Deleted ${paths.length} items`);
                 clearSelection();
                 loadDir(currentPath);
@@ -2361,6 +2543,45 @@
                 setStatus('', `Delete error: ${e.message}`);
             }
         }
+
+        document.addEventListener('keydown', async (e) => {
+            const mod = e.ctrlKey || e.metaKey;
+            const k = (e.key || '').toLowerCase();
+
+            if (isTypingTarget(document.activeElement)) return;
+
+            // Escape: close menus/modals or clear selection
+            if (e.key === 'Escape') {
+                ctxMenu.style.display = 'none';
+                if (document.getElementById('embed-modal')?.classList.contains('open')) document.getElementById('embed-modal').classList.remove('open');
+                if (document.getElementById('editor-modal')?.classList.contains('open')) { document.getElementById('editor-modal').classList.remove('open'); editingPath = null; }
+                if (document.getElementById('rename-modal')?.classList.contains('open')) { document.getElementById('rename-modal').classList.remove('open'); renamingItem = null; }
+                if (document.getElementById('move-modal')?.classList.contains('open')) { document.getElementById('move-modal').classList.remove('open'); movingItem = null; }
+                if (!isAnyModalOpen()) clearSelection();
+                return;
+            }
+
+            // Ctrl/Cmd+A: select all in current directory
+            if (mod && k === 'a') {
+                e.preventDefault();
+                selectAllInCurrentDir();
+                return;
+            }
+
+            // Ctrl/Cmd+Z: undo last operation
+            if (mod && k === 'z') {
+                e.preventDefault();
+                await undoLastAction();
+                return;
+            }
+
+            // Delete/Backspace: delete selection
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedPaths.size > 0) {
+                e.preventDefault();
+                await deleteSelected();
+                return;
+            }
+        }, true);
 
         document.getElementById('btn-back').onclick = () => {
             if (historyStack.length > 0) loadDir(historyStack.pop());
@@ -2415,7 +2636,7 @@
             if (!name) return;
             const fullPath = currentPath === '/' ? '/' + name : currentPath + '/' + name;
             try {
-                await fsMkdir(fullPath);
+                await fsMkdirWithUndo(fullPath);
                 setStatus('', `Created folder: ${name}`);
                 loadDir(currentPath);
             } catch (e) {
@@ -2427,42 +2648,95 @@
         document.getElementById('upload-input').onchange = async (e) => {
             const uploadedFiles = Array.from(e.target.files);
             if (!uploadedFiles.length) return;
-            setStatus('', `Importing ${uploadedFiles.length} file(s)…`);
-            for (const f of uploadedFiles) {
-                const dest = currentPath + '/' + f.name;
-                await fsWrite(dest, f);
+            const started = performance.now();
+            try {
+                await importFilesFlat(uploadedFiles, currentPath);
+                const ms = Math.round(performance.now() - started);
+                setStatus(`${uploadedFiles.length} imported`, `Done in ${ms} ms`);
+                loadDir(currentPath);
+            } catch (err) {
+                setStatus('', `Import error: ${err.message}`);
+            } finally {
+                e.target.value = '';
             }
-            e.target.value = '';
-            setStatus(`${uploadedFiles.length} imported`, '');
-            loadDir(currentPath);
         };
 
         document.getElementById('btn-upload-folder').onclick = () => document.getElementById('upload-folder-input').click();
         document.getElementById('upload-folder-input').onchange = async (e) => {
             const uploadedFiles = Array.from(e.target.files);
             if (!uploadedFiles.length) return;
-            const topFolder = uploadedFiles[0].webkitRelativePath.split('/')[0];
-            const baseDest = currentPath + '/' + topFolder;
-            setStatus('', `Importing folder "${topFolder}"…`);
+            const topFolder = uploadedFiles[0].webkitRelativePath.split('/')[0] || 'Imported Folder';
+            const started = performance.now();
             try {
-                await fsMkdir(baseDest);
-                for (const f of uploadedFiles) {
-                    const relParts = f.webkitRelativePath.split('/').slice(1);
-                    let destPath = baseDest;
-                    for (let i = 0; i < relParts.length - 1; i++) {
-                        destPath += '/' + relParts[i];
-                        await fsMkdir(destPath);
-                    }
-                    destPath += '/' + relParts[relParts.length - 1];
-                    await fsWrite(destPath, f);
-                }
-                e.target.value = '';
-                setStatus('', `Imported folder: ${topFolder}`);
+                await importFilesFromWebkitRelative(uploadedFiles, currentPath);
+                const ms = Math.round(performance.now() - started);
+                setStatus('', `Imported folder: ${topFolder} (${uploadedFiles.length} file(s), ${ms} ms)`);
                 loadDir(currentPath);
             } catch (err) {
                 setStatus('', `Folder import error: ${err.message}`);
+            } finally {
+                e.target.value = '';
             }
         };
+
+        function collectAllDirs(filePaths) {
+            const dirs = new Set();
+            for (const p of filePaths) {
+                let d = parentOf(normPath(p));
+                while (d && d !== '/' && !dirs.has(d)) {
+                    dirs.add(d);
+                    d = parentOf(d);
+                }
+            }
+            return Array.from(dirs).sort((a, b) => a.split('/').length - b.split('/').length);
+        }
+
+        async function idbPutManyChunked(nodes, chunkSize = 800) {
+            for (let i = 0; i < nodes.length; i += chunkSize) {
+                const chunk = nodes.slice(i, i + chunkSize);
+                await idbPutMany(chunk);
+            }
+        }
+
+        async function importFilesFlat(files, destDir) {
+            destDir = normPath(destDir || '/');
+            setStatus('', `Importing ${files.length} file(s)…`);
+            const now = Date.now();
+            const nodes = files.map(f => {
+                const path = normPath(destDir + '/' + f.name);
+                return { path, name: f.name, is_dir: false, parent: destDir, content: f, size: f.size || 0, created: now, modified: now };
+            });
+            await idbPutManyChunked(nodes);
+        }
+
+        async function importFilesFromWebkitRelative(files, destDir) {
+            destDir = normPath(destDir || '/');
+            setStatus('', `Importing folder (${files.length} file(s))…`);
+
+            const now = Date.now();
+            const filePaths = [];
+            const fileNodes = [];
+
+            for (const f of files) {
+                const rel = (f.webkitRelativePath || f.name || '').replace(/^\/+/, '');
+                const path = normPath(destDir + '/' + rel);
+                filePaths.push(path);
+                fileNodes.push({ path, name: nameOf(path), is_dir: false, parent: parentOf(path), content: f, size: f.size || 0, created: now, modified: now });
+            }
+
+            const dirPaths = collectAllDirs(filePaths);
+            const dirNodes = dirPaths.map(p => ({ path: p, name: nameOf(p), is_dir: true, parent: parentOf(p), content: null, size: 0, created: now, modified: now }));
+
+            // Directories first to keep the UI consistent (though IndexedDB itself does not require ordering).
+            await idbPutManyChunked(dirNodes);
+
+            const chunkSize = 300;
+            for (let i = 0; i < fileNodes.length; i += chunkSize) {
+                await idbPutMany(fileNodes.slice(i, i + chunkSize));
+                if ((i / chunkSize) % 2 === 0) await new Promise(r => requestAnimationFrame(r));
+                setStatus('', `Importing… ${Math.min(i + chunkSize, fileNodes.length)}/${fileNodes.length}`);
+            }
+        }
 
         function setStatus(count, msg) {
             if (count !== undefined) statusCount.textContent = count || '—';
@@ -2555,6 +2829,31 @@
                             destination: { type: 'string', description: 'Full path of the destination folder' }
                         },
                         required: ['source', 'destination']
+                    }
+                }
+            },
+            {
+                type: 'function',
+                function: {
+                    name: 'move_files',
+                    description: 'Move many files or directories into destination folders in one batch. Each destination folder must already exist.',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            moves: {
+                                type: 'array',
+                                description: 'List of move operations to perform.',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        source: { type: 'string', description: 'Full path of the source' },
+                                        destination: { type: 'string', description: 'Full path of the destination folder' }
+                                    },
+                                    required: ['source', 'destination']
+                                }
+                            }
+                        },
+                        required: ['moves']
                     }
                 }
             },
@@ -2677,27 +2976,64 @@
                     return text.slice(0, 4000);
                 }
                 case 'write_file': {
-                    await fsWrite(args.path, args.content, { ensureParent: false });
+                    await fsWriteWithUndo(args.path, args.content, { ensureParent: false });
                     loadDir(currentPath);
                     return 'File written successfully.';
                 }
                 case 'rename_file': {
-                    await fsRename(args.path, args.new_name);
+                    await fsRenameWithUndo(args.path, args.new_name);
                     loadDir(currentPath);
                     return `Renamed to ${args.new_name}`;
                 }
                 case 'move_file': {
-                    await fsMove(args.source, args.destination, { ensureDest: false });
+                    await fsMoveWithUndo(args.source, args.destination, { ensureDest: false });
                     loadDir(currentPath);
                     return `Moved to ${args.destination}`;
                 }
+                case 'move_files': {
+                    const moves = Array.isArray(args.moves) ? args.moves : [];
+                    if (!moves.length) return JSON.stringify({ moved: [], failed: [], summary: 'No moves provided.' });
+                    if (moves.length > 500) throw new Error(`Too many moves in one call (${moves.length}). Max is 500.`);
+
+                    const moved = [];
+                    const failed = [];
+                    const undoMoves = [];
+
+                    for (const m of moves) {
+                        const source = m?.source;
+                        const destination = m?.destination;
+                        if (!source || !destination) {
+                            failed.push({ source, destination, error: 'Missing source or destination.' });
+                            continue;
+                        }
+                        try {
+                            await fsMove(source, destination, { ensureDest: false });
+                            const fromParent = parentOf(normPath(source));
+                            const to = normPath(destination + '/' + nameOf(source));
+                            moved.push({ source, destination, new_path: to });
+                            undoMoves.push({ to, fromParent });
+                        } catch (e) {
+                            failed.push({ source, destination, error: e?.message || String(e) });
+                        }
+                    }
+
+                    if (undoMoves.length) pushUndo({ type: 'moves', moves: undoMoves });
+                    loadDir(currentPath);
+                    return JSON.stringify({
+                        moved,
+                        failed,
+                        summary: `Moved ${moved.length} item(s)` + (failed.length ? ` (${failed.length} failed).` : '.')
+                    });
+                }
                 case 'delete_file': {
+                    const undoNodes = await snapshotNodesForPaths([args.path]);
                     await fsDelete(args.path);
+                    if (undoNodes) pushUndo({ type: 'delete', nodes: undoNodes });
                     loadDir(currentPath);
                     return `Deleted ${args.path}`;
                 }
                 case 'create_directory': {
-                    await fsMkdir(args.path);
+                    await fsMkdirWithUndo(args.path);
                     loadDir(currentPath);
                     return `Directory created: ${args.path}`;
                 }
@@ -2745,7 +3081,19 @@
         function addToolCall(name, args) {
             const div = document.createElement('div');
             div.className = 'tool-call';
-            const argStr = JSON.stringify(args, null, 0).slice(0, 120);
+            let argStr = '';
+            try {
+                if (args && typeof args === 'object' && Array.isArray(args.moves) && args.moves.length > 20) {
+                    argStr = JSON.stringify({
+                        moves: args.moves.slice(0, 2),
+                        _note: `… +${args.moves.length - 2} more move(s)`
+                    }).slice(0, 120);
+                } else {
+                    argStr = JSON.stringify(args, null, 0).slice(0, 120);
+                }
+            } catch (e) {
+                argStr = '{}';
+            }
             div.innerHTML = `<div class="tc-name"><i class="fa-solid fa-gear"></i> ${name}</div><div class="tc-args">${argStr}</div>`;
             chatMessages.appendChild(div);
             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -2788,7 +3136,7 @@
 
             const sysPrompt = `You are CLIO, an AI file manager agent. The filesystem is stored locally in the browser (IndexedDB). Paths start from /. The user's current directory is: ${currentPath}.
 You have tools to list, read, write, rename, copy, move, delete files, search, navigate, and check disk usage.
-You CAN call multiple tools in a single response when performing batch operations (e.g. renaming many files). Always list the directory first if you don't know its contents. Be concise in text responses. You do NOT have access to markdown so dont use them.
+You CAN call multiple tools in a single response when performing batch operations (e.g. renaming many files). When moving many items, prefer move_files over repeated move_file calls. Always list the directory first if you do not know its contents. Be concise in text responses. You do NOT have access to markdown so dont use them.
 You are a professional assistant. Communicate with formality, precision, and clarity at all times.
 
 Guidelines:
